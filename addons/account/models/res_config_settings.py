@@ -74,9 +74,20 @@ class ResConfigSettings(models.TransientModel):
     module_account_taxcloud = fields.Boolean(string="Account TaxCloud")
     tax_exigibility = fields.Boolean(string='Cash Basis', related='company_id.tax_exigibility')
     tax_cash_basis_journal_id = fields.Many2one('account.journal', related='company_id.tax_cash_basis_journal_id', string="Tax Cash Basis Journal")
-    account_hide_setup_bar = fields.Boolean(string='Hide Setup Bar', related='company_id.account_setup_bar_closed',help="Tick if you wish to hide the setup bar on the dashboard")
     invoice_reference_type = fields.Selection(string='Communication',
         related='company_id.invoice_reference_type', help='Default Reference Type on Invoices.')
+    account_bank_reconciliation_start = fields.Date(string="Bank Reconciliation Threshold",
+        related='company_id.account_bank_reconciliation_start',
+        help="""The bank reconciliation widget won't ask to reconcile payments older than this date.
+               This is useful if you install accounting after having used invoicing for some time and
+               don't want to reconcile all the past payments with bank statements.""")
+    account_sanitize_invoice_ref = fields.Boolean(string="Sanitize Invoice References", related='company_id.account_sanitize_invoice_ref', help="If checked, customer invoices' and vendor bills' referneces will automatically correct their reference so that they are maximum 140 characters long, consist only of latin characters, contain no '//' sequence, and have no leading or trailing /.")
+
+    qr_code = fields.Boolean(string='Display SEPA QR code', related='company_id.qr_code')
+    qr_code_payment_journal_id = fields.Many2one('account.journal', related='company_id.qr_code_payment_journal_id', string="Payment Journal", domain="['&',('type', '=', 'bank'), ('currency_id.name','=','EUR')]")
+    qr_code_valid = fields.Boolean(string='Has all required arguments', related="qr_code_payment_journal_id.bank_account_id.qr_code_valid")
+    invoice_is_print = fields.Boolean(string='Print', related='company_id.invoice_is_print')	
+    invoice_is_email = fields.Boolean(string='Send Email', related='company_id.invoice_is_email')
 
     @api.multi
     def set_values(self):
@@ -85,27 +96,13 @@ class ResConfigSettings(models.TransientModel):
             self.env.ref('base.group_user').write({'implied_ids': [(4, self.env.ref('product.group_sale_pricelist').id)]})
         """ install a chart of accounts for the given company (if required) """
         if self.chart_template_id and self.chart_template_id != self.company_id.chart_template_id:
-            wizard = self.env['wizard.multi.charts.accounts'].create({
-                'company_id': self.company_id.id,
-                'chart_template_id': self.chart_template_id.id,
-                'code_digits': self.chart_template_id.code_digits,
-                'sale_tax_rate': 15.0,
-                'purchase_tax_rate': 15.0,
-                'code_digits': self.chart_template_id.code_digits,
-                'complete_tax_set': self.chart_template_id.complete_tax_set,
-                'currency_id': self.currency_id.id,
-                'bank_account_code_prefix': self.chart_template_id.bank_account_code_prefix,
-                'cash_account_code_prefix': self.chart_template_id.cash_account_code_prefix,
-                'transfer_account_code_prefix': self.chart_template_id.transfer_account_code_prefix,
-            })
-            wizard.onchange_chart_template_id()
-            wizard.execute()
+            self.chart_template_id.load_for_current_company(15.0, 15.0)
 
     @api.depends('company_id')
     def _compute_has_chart_of_accounts(self):
         self.has_chart_of_accounts = bool(self.company_id.chart_template_id)
         self.chart_template_id = self.company_id.chart_template_id or False
-        self.has_accounting_entries = self.env['wizard.multi.charts.accounts'].existing_accounting(self.company_id)
+        self.has_accounting_entries = self.env['account.chart.template'].existing_accounting(self.company_id)
 
     @api.onchange('show_line_subtotals_tax_selection')
     def _onchange_sale_tax(self):

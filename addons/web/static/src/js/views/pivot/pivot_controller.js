@@ -164,8 +164,11 @@ var PivotController = AbstractController.extend({
             fields: fields
         }));
 
+        var cssProps = {top: top};
+        cssProps[_t.database.parameters.direction === 'rtl' ? 'right' : 'left'] =
+            _t.database.parameters.direction === 'rtl' ? this.$el.width() - left : left;
         this.$fieldSelection.find('.dropdown-menu').first()
-            .css({top: top, left: left})
+            .css(cssProps)
             .addClass('show');
     },
     /**
@@ -235,16 +238,23 @@ var PivotController = AbstractController.extend({
      * @param {MouseEvent} event
      */
     _onCellClick: function (event) {
-        var $target = $(event.target);
+        var $target = $(event.currentTarget);
         if ($target.hasClass('o_pivot_header_cell_closed') ||
             $target.hasClass('o_pivot_header_cell_opened') ||
             $target.hasClass('o_empty') ||
+            $target.data('type') === 'variation' ||
             !this.enableLinking) {
             return;
         }
         var state = this.model.get(this.handle);
-        var colDomain = this.model.getHeader($target.data('col_id')).domain;
-        var rowDomain = this.model.getHeader($target.data('id')).domain;
+        var colDomain, rowDomain;
+        if ($target.data('type') === 'comparisonData') {
+            colDomain = this.model.getHeader($target.data('col_id')).comparisonDomain || [];
+            rowDomain = this.model.getHeader($target.data('id')).comparisonDomain || [];
+        } else {
+            colDomain = this.model.getHeader($target.data('col_id')).domain || [];
+            rowDomain = this.model.getHeader($target.data('id')).domain || [];
+        }
         var context = _.omit(state.context, function (val, key) {
             return key === 'group_by' || _.str.startsWith(key, 'search_default_');
         });

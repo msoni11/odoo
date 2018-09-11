@@ -16,33 +16,16 @@ class FinancialYearOpeningWizard(models.TransientModel):
                                              related="company_id.fiscalyear_last_month",
                                              required=True,
                                              help="The last day of the month will be taken if the chosen day doesn't exist.")
-    account_setup_fy_data_done = fields.Boolean(string='Financial year setup marked as done', compute="_compute_setup_marked_done")
-
-    @api.depends('company_id.account_setup_fy_data_done')
-    def _compute_setup_marked_done(self):
-        for record in self:
-            record.account_setup_fy_data_done = record.company_id.account_setup_fy_data_done
 
     @api.depends('company_id.account_opening_move_id')
     def _compute_opening_move_posted(self):
         for record in self:
             record.opening_move_posted = record.company_id.opening_move_posted()
 
-    @api.multi
-    def write(self, vals):
-        if 'fiscalyear_last_day' in vals or 'fiscalyear_last_month' in vals:
-            for wizard in self:
-                company = wizard.company_id
-                vals['fiscalyear_last_day'] = company._verify_fiscalyear_last_day(
-                    company.id,
-                    vals.get('fiscalyear_last_day'),
-                    vals.get('fiscalyear_last_month'))
-        return super(FinancialYearOpeningWizard, self).write(vals)
 
     @api.multi
     def action_save_onboarding_fiscal_year(self):
-        self.env.user.company_id.account_setup_fy_data_done = True
-
+        self.env.user.company_id.set_onboarding_step_done('account_setup_fy_data_state')
 
 class SetupBarBankConfigWizard(models.TransientModel):
     _inherits = {'res.partner.bank': 'res_partner_bank_id'}

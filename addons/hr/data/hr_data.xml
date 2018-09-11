@@ -10,12 +10,12 @@
           <field name="name">Sales</field>
         </record>
 
-        <record id="employee_root" model="hr.employee">
-            <field name="name" eval="obj(ref('base.partner_root')).name" model="res.partner"/>
-            <field name="user_id" ref="base.user_root"/>
-            <field name="address_id" ref="base.partner_root"/>
-            <field name="address_home_id" ref="base.partner_root"/>
-            <field name="image" eval="obj(ref('base.partner_root')).image" model="res.partner"/>
+        <record id="employee_admin" model="hr.employee">
+            <field name="name" eval="obj(ref('base.partner_admin')).name" model="res.partner"/>
+            <field name="user_id" ref="base.user_admin"/>
+            <field name="address_id" ref="base.partner_admin"/>
+            <field name="address_home_id" ref="base.partner_admin"/>
+            <field name="image" eval="obj(ref('base.partner_admin')).image" model="res.partner"/>
         </record>
 
         <record id="mail_template_data_unknown_employee_email_address" model="mail.template">
@@ -46,7 +46,7 @@
 <tr><td align="center" style="min-width: 590px;">
     <table border="0" cellpadding="0" cellspacing="0" width="590" style="min-width: 590px; background-color: #F1F1F1; color: #454748; padding: 8px; border-collapse:separate;">
       <tr><td style="text-align: center; font-size: 13px;">
-        Powered by <a target="_blank" href="https://www.odoo.com" style="color: #875A7B;">Odoo</a>
+        Powered by <a target="_blank" href="https://www.odoo.com?utm_source=db&amp;utm_medium=hr" style="color: #875A7B;">Odoo</a>
       </td></tr>
     </table>
 </td></tr>

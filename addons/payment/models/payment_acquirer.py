@@ -224,7 +224,7 @@ class PaymentAcquirer(models.Model):
         :return: a dictionary to create a account.journal record.
         '''
         self.ensure_one()
-        account_vals = self.env['wizard.multi.charts.accounts']._prepare_transfer_account(self.name, self.company_id)
+        account_vals = self.env['account.chart.template']._prepare_transfer_account_for_direct_creation(self.name, self.company_id)
         account = self.env['account.account'].create(account_vals)
         inbound_payment_method_ids = []
         if self.token_implemented and self.payment_flow == 's2s':
@@ -640,13 +640,13 @@ class PaymentTransaction(models.Model):
     def _get_payment_transaction_sent_message(self):
         self.ensure_one()
         if self.payment_token_id:
-            message = _('A transaction %s with %s has been initiated using %s credit card.')
+            message = _('A transaction %s with %s initiated using %s credit card.')
             message_vals = (self.reference, self.acquirer_id.name, self.payment_token_id.name)
         elif self.provider in ('manual', 'transfer'):
             message = _('The customer has selected %s to pay this document.')
             message_vals = (self.acquirer_id.name)
         else:
-            message = _('A transaction %s with %s has been initiated.')
+            message = _('A transaction %s with %s initiated.')
             message_vals = (self.reference, self.acquirer_id.name)
         if self.provider not in ('manual', 'transfer'):
             message += ' ' + _('Waiting for payment confirmation...')

@@ -114,7 +114,7 @@ var DebouncedField = AbstractField.extend({
      */
     commitChanges: function () {
         if (this._isDirty && this.mode === 'edit') {
-            this._doAction();
+            return this._doAction();
         }
     },
 
@@ -135,7 +135,7 @@ var DebouncedField = AbstractField.extend({
         // do anything (commitChanges ensures that if it has local changes, they
         // are triggered up before the widget is destroyed, if necessary).
         if (!this.isDestroyed()) {
-            this._setValue(this._getValue());
+            return this._setValue(this._getValue());
         }
     },
     /**
@@ -896,6 +896,147 @@ var FieldFloatTime = FieldFloat.extend({
     // 'float_time', but for the sake of clarity, we explicitely define a
     // FieldFloatTime widget with formatType = 'float_time'.
     formatType: 'float_time',
+
+    init: function () {
+        this._super.apply(this, arguments);
+        this.formatType = 'float_time';
+    }
+});
+
+var FieldFloatFactor = FieldFloat.extend({
+    supportedFieldTypes: ['float'],
+    className: 'o_field_float_factor',
+    formatType: 'float_factor',
+
+    /**
+     * @constructor
+     */
+    init: function () {
+        this._super.apply(this, arguments);
+        // default values
+        if (!this.nodeOptions.factor){
+            this.nodeOptions.factor = 1;
+        }
+        // use as format and parse options
+        this.parseOptions = this.nodeOptions;
+    }
+});
+
+/**
+ * The goal of this widget is to replace the input field by a button containing a
+ * range of possible values (given in the options). Each click allows the user to loop
+ * in the range. The purpose here is to restrict the field value to a predefined selection.
+ * Also, the widget support the factor conversion as the *float_factor* widget (Range values
+ * should be the result of the conversion).
+ **/
+var FieldFloatToggle = AbstractField.extend({
+    supportedFieldTypes: ['float'],
+    formatType: 'float_factor',
+    className: 'o_field_float_toggle',
+    tagName: 'span',
+    events: {
+        click: '_onClick'
+    },
+
+    /**
+     * @constructor
+     */
+    init: function () {
+        this._super.apply(this, arguments);
+
+        this.formatType = 'float_factor';
+
+        if (this.mode === 'edit') {
+            this.tagName = 'button';
+        }
+
+        // we don't inherit Float Field
+        if (this.attrs.digits) {
+            this.nodeOptions.digits = JSON.parse(this.attrs.digits);
+        }
+        // default values
+        if (!this.nodeOptions.factor){
+            this.nodeOptions.factor = 1;
+        }
+        if (!this.nodeOptions.range){
+            this.nodeOptions.range = [0.0, 0.5, 1.0];
+        }
+
+        // use as format and parse options
+        this.parseOptions = this.nodeOptions;
+    },
+
+    //--------------------------------------------------------------------------
+    // Private
+    //--------------------------------------------------------------------------
+
+    /**
+     * Get the display value but in real type to use it in calculations
+     *
+     * @private
+     * @returns {float} The current formatted value
+     */
+    _getDisplayedValue: function () {
+        return parseFloat(this._formatValue(this.value));
+    },
+    /**
+     * Formats the HTML input tag for edit mode and stores selection status.
+     *
+     * @override
+     * @private
+     */
+    _renderEdit: function () {
+        // Keep a reference to the input so $el can become something else
+        // without losing track of the actual input.
+        this.$el.text(this._formatValue(this.value));
+    },
+    /**
+     * Resets the content to the formated value in readonly mode.
+     *
+     * @override
+     * @private
+     */
+    _renderReadonly: function () {
+        this.$el.text(this._formatValue(this.value));
+    },
+    /**
+     * Get the next value in the range, from the current one. If the current
+     * one is not in the range, the next value of the closest one will be chosen.
+     *
+     * @private
+     * @returns {number} The next formatted value in the range
+     */
+    _nextValue: function () {
+        var range = this.nodeOptions.range;
+        var val =  utils.closestNumber(this._getDisplayedValue(), range);
+        var index = _.indexOf(range, val);
+        if (index !== -1) {
+            if (index + 1 < range.length) {
+                return range[index + 1];
+            }
+        }
+        return range[0];
+    },
+
+    //--------------------------------------------------------------------------
+    // Handlers
+    //--------------------------------------------------------------------------
+
+    /**
+     * Clicking on the button triggers the change of value; the next one of
+     * the range will be displayed.
+     *
+     * @private
+     * @param {OdooEvent} ev
+     */
+    _onClick: function(ev) {
+        if (this.mode === 'edit') {
+            ev.stopPropagation(); // only stop propagation in edit mode
+            var next_val = this._nextValue();
+            this._setValue(next_val.toString()); // will be parsed in _setValue
+        }
+    },
+
 });
 
 var FieldPercentage = FieldFloat.extend({
@@ -930,7 +1071,17 @@ var FieldText = InputField.extend(TranslatableFieldMixin, {
         }
         return this._super();
     },
-
+    /**
+     * Override to force a resize of the textarea when its value has changed
+     *
+     * @override
+     */
+    reset: function () {
+        var self = this;
+        return $.when(this._super.apply(this, arguments)).then(function () {
+            self.$input.trigger('change');
+        });
+    },
     //--------------------------------------------------------------------------
     // Handlers
     //--------------------------------------------------------------------------
@@ -1100,10 +1251,14 @@ var CopyClipboard = {
         var self = this;
         var $clipboardBtn = this.$('.o_clipboard_button');
         $clipboardBtn.tooltip({title: _t('Copied !'), trigger: 'manual', placement: 'right'});
-        this.clipboard = new Clipboard($clipboardBtn.get(0), {
-            text: function () {
-                return self.value.trim();
-            }
+        this.clipboard = new ClipboardJS($clipboardBtn[0], {
+            text: function (_) {
+               return self.value.trim();
+            },
+            // Container added because of Bootstrap modal that give the focus to another element.
+            // We need to give to correct focus to ClipboardJS (see in ClipboardJS doc)
+            // https://github.com/zenorocha/clipboard.js/issues/155
+            container: self.$el[0]
         });
         this.clipboard.on('success', function () {
             _.defer(function () {
@@ -1750,7 +1905,7 @@ var FavoriteWidget = AbstractField.extend({
      */
     _render: function () {
         var tip = this.value ? _t('Remove from Favorites') : _t('Add to Favorites');
-        var template = this.attrs.nolabel ? '<a href="#"><i class="fa %s" title="%s" aria-label="%s" role="img"></i></a>' : '<a href="#"><i class="fa %s" role="img" aria-label="%s"> %s</i></a>';
+        var template = this.attrs.nolabel ? '<a href="#"><i class="fa %s" title="%s" aria-label="%s" role="img"></i></a>' : '<a href="#"><i class="fa %s" role="img" aria-label="%s"></i> %s</a>';
         this.$el.empty().append(_.str.sprintf(template, this.value ? 'fa-star' : 'fa-star-o', tip, tip));
     },
 
@@ -1856,31 +2011,9 @@ var FieldBooleanButton = AbstractField.extend({
 });
 
 var BooleanToggle = FieldBoolean.extend({
+    className: FieldBoolean.prototype.className + ' o_boolean_toggle',
     events: {
         'click': '_onClick'
-    },
-    //--------------------------------------------------------------------------
-    // Private
-    //--------------------------------------------------------------------------
-
-    /**
-     * @override
-     * @private
-     */
-    _render: function () {
-        this._super.apply(this, arguments);
-        this._renderToggleSwitch();
-    },
-
-    /**
-     * Display toggle switch
-     *
-     * @private
-     */
-    _renderToggleSwitch: function () {
-        this.$el.addClass("o_boolean_toggle");
-        var $div = $('<div class="slider"></div>');
-        $div.insertAfter(this.$("input[type=checkbox]"));
     },
 
     //--------------------------------------------------------------------------
@@ -1898,7 +2031,6 @@ var BooleanToggle = FieldBoolean.extend({
         this._setValue(!this.value);
         this.$el.closest(".o_data_row").toggleClass('text-muted', this.value);
     },
-
 });
 
 var StatInfo = AbstractField.extend({
@@ -2239,6 +2371,25 @@ var JournalDashboardGraph = AbstractField.extend({
         }
         this._super.apply(this, arguments);
     },
+    /**
+     * The widget view uses the nv(d3) lib to render the graph. This lib
+     * requires that the rendering is done directly into the DOM (so that it can
+     * correctly compute positions). However, the views are always rendered in
+     * fragments, and appended to the DOM once ready (to prevent them from
+     * flickering). We here use the on_attach_callback hook, called when the
+     * widget is attached to the DOM, to perform the rendering. This ensures
+     * that the rendering is always done in the DOM.
+     */
+    on_attach_callback: function () {
+        this._isInDOM = true;
+        this._renderInDOM();
+    },
+    /**
+     * Called when the field is detached from the DOM.
+     */
+    on_detach_callback: function () {
+        this._isInDOM = false;
+    },
 
     //--------------------------------------------------------------------------
     // Private
@@ -2259,9 +2410,25 @@ var JournalDashboardGraph = AbstractField.extend({
         }
     },
     /**
+     * Render the widget only when it is in the DOM. This is because nvd3
+     * renders graph only when it is in DOM, apparently to compute available
+     * height and width for instance.
+     *
+     * @override
      * @private
      */
     _render: function () {
+        if (this._isInDOM) {
+            return this._renderInDOM();
+        }
+        return $.when();
+    },
+    /**
+     * Render the widget. This function assumes that it is attached to the DOM.
+     *
+     * @private
+     */
+    _renderInDOM: function () {
         // note: the rendering of this widget is aynchronous as nvd3 does a
         // setTimeout(0) before executing the callback given to addGraph
         var self = this;
@@ -2686,56 +2853,6 @@ var AceEditor = DebouncedField.extend({
     },
 });
 
-var ImageSelection = AbstractField.extend({
-    supportedFieldTypes: ['selection'],
-    events: _.extend({}, AbstractField.prototype.events, {
-        'click img': '_onImgClicked',
-    }),
-
-    //--------------------------------------------------------------------------
-    // Private
-    //--------------------------------------------------------------------------
-
-    /**
-     * @override
-     * @private
-     */
-    _render: function () {
-        var self = this;
-        this.$el.empty();
-        _.each(this.nodeOptions, function (val, key) {
-            var $container = $('<div>').addClass('col-3 text-center');
-            var $img = $('<img>')
-                .addClass('img img-fluid img-thumbnail ml16')
-                .toggleClass('btn-info', key === self.value)
-                .attr('src', val.image_link)
-                .data('key', key);
-            $container.append($img);
-            if (val.preview_link) {
-                var $previewLink = $('<a>')
-                    .text('Preview')
-                    .attr('href', val.preview_link)
-                    .attr('target', '_blank');
-                $container.append($previewLink);
-            }
-            self.$el.append($container);
-        });
-    },
-
-    //--------------------------------------------------------------------------
-    // Handlers
-    //--------------------------------------------------------------------------
-
-    /**
-     * @override
-     * @private
-     * @param {MouseEvent} event
-     */
-    _onImgClicked: function (event) {
-        this._setValue($(event.currentTarget).data('key'));
-    },
-});
-
 return {
     TranslatableFieldMixin: TranslatableFieldMixin,
     DebouncedField: DebouncedField,
@@ -2753,6 +2870,8 @@ return {
     FieldDomain: FieldDomain,
     FieldFloat: FieldFloat,
     FieldFloatTime: FieldFloatTime,
+    FieldFloatFactor: FieldFloatFactor,
+    FieldFloatToggle: FieldFloatToggle,
     FieldPercentage : FieldPercentage,
     FieldInteger: FieldInteger,
     FieldMonetary: FieldMonetary,
@@ -2764,7 +2883,6 @@ return {
     HandleWidget: HandleWidget,
     InputField: InputField,
     AttachmentImage: AttachmentImage,
-    ImageSelection: ImageSelection,
     LabelSelection: LabelSelection,
     StateSelectionWidget: StateSelectionWidget,
     FavoriteWidget: FavoriteWidget,

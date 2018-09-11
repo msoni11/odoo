@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
-from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT as DATETIME_FORMAT
 
 
 class AccountCashboxLine(models.Model):
@@ -100,7 +99,7 @@ class PosConfig(models.Model):
         help='The receipt screen will be skipped if the receipt can be printed automatically.')
     iface_precompute_cash = fields.Boolean(string='Prefill Cash Payment',
         help='The payment input will behave similarily to bank payment input, and will be prefilled with the exact due amount.')
-    iface_tax_included = fields.Selection([('subtotal', 'Tax-Excluded Price'), ('total', 'Tax-Included Price')], related="company_id.iface_tax_included", required=True)
+    iface_tax_included = fields.Selection([('subtotal', 'Tax-Excluded Price'), ('total', 'Tax-Included Price')], string="Tax Display", default='subtotal', required=True)
     iface_start_categ_id = fields.Many2one('pos.category', string='Initial Category',
         help='The point of sale will display this product category by default. If no category is specified, all available products will be shown.')
     iface_display_categ_images = fields.Boolean(string='Display Category Pictures',
@@ -196,7 +195,7 @@ class PosConfig(models.Model):
                 order="stop_at desc", limit=1)
             if session:
                 pos_config.last_session_closing_cash = session[0]['cash_register_balance_end_real']
-                pos_config.last_session_closing_date = session[0]['stop_at']
+                pos_config.last_session_closing_date = session[0]['stop_at'].date()
             else:
                 pos_config.last_session_closing_cash = 0
                 pos_config.last_session_closing_date = False
@@ -209,7 +208,7 @@ class PosConfig(models.Model):
                 pos_config.pos_session_username = session[0].user_id.name
                 pos_config.pos_session_state = session[0].state
                 pos_config.pos_session_duration = (
-                    datetime.now() - datetime.strptime(session[0].start_at, DATETIME_FORMAT)
+                    datetime.now() - session[0].start_at
                 ).days if session[0].start_at else 0
             else:
                 pos_config.pos_session_username = False

@@ -67,6 +67,7 @@ var AbstractController = AbstractAction.extend(ControlPanelMixin, {
         this.searchView = params.searchView;
         this.searchViewHidden = params.searchViewHidden;
         this.groupable = params.groupable;
+        this.enableTimeRangeMenu = params.enableTimeRangeMenu;
         this.actionViews = params.actionViews;
         this.viewType = params.viewType;
         this.withControlPanel = params.withControlPanel !== false;
@@ -283,22 +284,22 @@ var AbstractController = AbstractAction.extend(ControlPanelMixin, {
         });
     },
    /**
-     * Renders the html provided by the route specified by the
-     * bannerRoute attribute on the controller (banner_route in the template).
-     * Renders it before the view output and add a css class 'o_has_banner' to it.
-     * There can be only one banner displayed at a time.
-     *
-     * If the banner contains stylesheet links, they are moved to <head>
-     * (and will only be fetched once).
-     *
-     * Route example:
-     * @http.route('/module/hello', auth='user', type='json')
-     * def hello(self):
-     *     return {'html': '<h1>hello, world</h1>'}
-     *
-     * @private
-     * @returns {Deferred}
-     */
+    * Renders the html provided by the route specified by the
+    * bannerRoute attribute on the controller (banner_route in the template).
+    * Renders it before the view output and add a css class 'o_has_banner' to it.
+    * There can be only one banner displayed at a time.
+    *
+    * If the banner contains stylesheet links or js files, they are moved to <head>
+    * (and will only be fetched once).
+    *
+    * Route example:
+    * @http.route('/module/hello', auth='user', type='json')
+    * def hello(self):
+    *     return {'html': '<h1>hello, world</h1>'}
+    *
+    * @private
+    * @returns {Deferred}
+    */
     _renderBanner: function () {
         if (this.bannerRoute !== undefined) {
             var self = this;
@@ -315,12 +316,15 @@ var AbstractController = AbstractAction.extend(ControlPanelMixin, {
                     if (self._$banner && self._$banner.remove) {
                         self._$banner.remove();
                     }
-                    // Stylesheets are moved to <head> and we wait for them to be loaded
-                    // to prevent displaying unstyled content.
+                    // Css and js are moved to <head>
                     var defs = [];
                     $('link[rel="stylesheet"]', $banner).each(function (i, link) {
                         defs.push(ajax.loadCSS(link.href));
                         link.remove();
+                    });
+                    $('script[type="text/javascript"]', $banner).each(function (i, js) {
+                        defs.push(ajax.loadJS(js.src));
+                        js.remove();
                     });
                     return $.when.apply($, defs).then(function () {
                         $banner.prependTo(self.$el);
@@ -425,6 +429,7 @@ var AbstractController = AbstractAction.extend(ControlPanelMixin, {
             searchview: this.searchView,
             search_view_hidden: !this.searchable || this.searchviewHidden,
             groupable: this.groupable,
+            enableTimeRangeMenu: this.enableTimeRangeMenu,
         });
 
         this._pushState();

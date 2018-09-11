@@ -5,6 +5,7 @@
 
 // LAYOUTING
 body.o_connected_user {
+    direction: ltr;
     padding-top: $o-navbar-height!important;
 }
 
@@ -37,7 +38,7 @@ body.o_connected_user {
         }
     }
     .o_menu_systray {
-        a {
+        > li > a {
             padding: 0 $grid-gutter-width/2;
 
             &.css_edit_dynamic{
@@ -192,6 +193,69 @@ body .modal {
             padding-right: 25px;
             background-color: white;
             margin-left: -1px;
+        }
+        .o_seo_og_image {
+            .o_meta_img {
+                position: relative;
+                transition: border-color 200ms;
+                display: inline-block;
+                border: 2px solid gray('400');
+
+                > img {
+                    width: 70px;
+                    height: 70px;
+                    object-fit: cover;
+                    cursor: pointer;
+                }
+
+                &:hover {
+                    border-color: $o-brand-primary;
+                }
+
+                &.o_active_image {
+                    border-color: $o-brand-primary;
+
+                    &:before {
+                        @include o-position-absolute($right: 0);
+                        content: '';
+                        border: 16px solid rgba($o-brand-primary, 0.8);
+                        border-left-color: transparent;
+                        border-bottom-color: transparent;
+                    }
+
+                    &:after {
+                        @include o-position-absolute(2px, 3px);
+                        display: inline-block;
+                        content: "\f00c";
+                        font-family: FontAwesome;
+                        color: white;
+                        font-size: 12px;
+                    }
+                }
+                .o-custom-label {
+                    @include o-position-absolute($bottom: 0px);
+                    background: rgba(gray('800'), 0.6);
+                    font-size: 12px;
+                }
+            }
+            .o_meta_img_upload {
+                transition: 200ms;
+                display: inline-block;
+                padding: 23px 27px;
+                border: 2px dashed lighten(gray('600'), 30%);
+                vertical-align: top;
+                cursor: pointer;
+                color: lighten(gray('600'), 30%);
+
+                &:hover {
+                    border-color: $o-brand-primary;
+                    color: $o-brand-primary;
+                }
+            }
+            .o_meta_active_img {
+                height: 240px;
+                object-fit: cover;
+            }
         }
 
         .table {
@@ -417,54 +481,6 @@ body .modal {
     margin: 50px auto;
 }
 
-// CUSTOMIZE THEME
-#theme_error {
-    background: #ffc;
-}
-#theme_customize_modal {
-    overflow: visible;
-    display: block;
-    .modal-dialog {
-        @include o-position-absolute($o-navbar-height + 10, 10px);
-        width: auto;
-        margin: 0;
-        font-family: Roboto;
-    }
-    .loading_backdrop {
-        display: none;
-    }
-    &.loading .loading_backdrop {
-        @include o-position-absolute(0, 0, 0, 0);
-        display: block;
-        background: black;
-        opacity: 0.3;
-        z-index: 1;
-    }
-    label {
-        display: block;
-        text-align: center;
-        > div, > img {
-            border: 1px solid #fff;
-            line-height: 30px;
-            font-size: 0.9em;
-            margin: 2px 4px;
-        }
-        &.checked > div, &.checked > img {
-            box-shadow: 2px 2px 3px #888;
-            border: 1px solid #666;
-        }
-        img {
-            width: 60px;
-            height: 35px;
-            margin: 2px;
-            border: 1px solid rgba(136, 136, 136, 0.5);
-        }
-        input {
-            display: none;
-        }
-    }
-}
-
 // ACE EDITOR
 .o_ace_view_editor {
     @include o-w-preserve-base;
@@ -510,16 +526,24 @@ body .modal {
         padding-top: 9px;
     }
 }
-#edit_website_pages {
+#list_website_pages {
     th {
         background-color: $o-brand-odoo;
         color: white;
     }
-    td > a.fa {
-        margin-left: 5px;
-        color: $o-brand-odoo;
+    td, th {
+        padding: 0.45rem;
+    }
+    td {
+        > a.fa {
+            margin-left: 5px;
+            color: $o-brand-odoo;
+        }
+        .text-muted {
+            opacity: 0.5;
+        }
     }
     .fa-check, .fa-eye-slash {
-        color: $o-brand-primary;
+        color: $info;
     }
 }

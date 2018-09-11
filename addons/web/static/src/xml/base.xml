@@ -210,8 +210,8 @@
 </t>
 
 <t t-name="ControlPanel.SwitchButtons.Mobile">
-    <button class="btn btn-primary btn-sm dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-        <span class="o_switch_view_button_icon"/><span class="caret ml8"/>
+    <button class="btn btn-link btn-sm" data-toggle="dropdown" aria-expanded="false">
+        <span class="o_switch_view_button_icon"/>
     </button>
     <ul class="dropdown-menu dropdown-menu-right list-inline">
         <li t-foreach="views" t-as="view">
@@ -228,7 +228,7 @@
 
 <t t-name="WebClient.DebugManager">
     <li class="o_debug_manager" role="menuitem">
-        <a href="#" title="Open Developer Tools" aria-label="Open Developer Tools" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false" tabindex="-1">
+        <a href="#" title="Open Developer Tools" aria-label="Open Developer Tools" data-toggle="dropdown" aria-expanded="false" tabindex="-1">
             <span class="fa fa-bug"/>
         </a>
         <div class="dropdown-menu dropdown-menu-right o_debug_dropdown" role="menu"/>
@@ -258,17 +258,6 @@
             <a role="menuitem" href="#" data-action="translate" class="dropdown-item">Technical Translation</a>
         </t>
     </t>
-</t>
-<t t-name="WebClient.DebugManager.Action.Fields">
-    <dl><t t-foreach="fields" t-as="field">
-        <dt><h4><t t-esc="field"/></h4></dt>
-        <dd>
-            <dl><ul role="menu"><li role="menuitem" t-foreach="field_value" t-as="attribute">
-                <strong><t t-esc="attribute"/></strong>:
-                <t t-esc="attribute_value"/>
-            </li></ul></dl>
-        </dd>
-    </t></dl>
 </t>
 <t t-name="WebClient.DebugManager.View">
     <t t-if="view">
@@ -771,7 +760,7 @@
 </t>
 <ul t-name="ModelFieldSelector.page" class="o_field_selector_page">
     <t t-foreach="lines" t-as="line">
-        <t t-set="relationToFollow" t-value="followRelations &amp;&amp; line.relation"/>
+        <t t-set="relationToFollow" t-value="followRelations(line) &amp;&amp; line.relation"/>
         <li t-attf-class="o_field_selector_item #{relationToFollow and 'o_field_selector_next_page' or 'o_field_selector_select_button'}#{line_index == 0 and ' active' or ''}"
             t-att-data-name="line.name">
             <t t-esc="line.string"/>
@@ -829,7 +818,7 @@
                 t-att-id="widget.idForLabel"/>
             <a role="button" class="o_dropdown_button" draggable="false"/>
         </div>
-        <button type="button" t-if="!widget.nodeOptions.no_open" class="fa fa-external-link btn btn-secondary o_external_button" tabindex="-1" draggable="false" aria-label="External link" title="External link"/>
+        <button type="button" t-if="!widget.noOpen" class="fa fa-external-link btn btn-secondary o_external_button" tabindex="-1" draggable="false" aria-label="External link" title="External link"/>
     </div>
 </t>
 <t t-name="FieldReference" t-extend="FieldMany2One">
@@ -844,10 +833,12 @@
     <t t-foreach="elements" t-as="el">
         <t t-set="color" t-value="el[colorField] || 0"/>
         <t t-set="colornames" t-value="['No color', 'Red', 'Orange', 'Yellow', 'Light blue', 'Dark purple', 'Salmon pink', 'Medium blue', 'Dark blue', 'Fushia', 'Green', 'Purple']"/>
-        <button t-attf-class="badge badge-pill dropdown o_tag_color_#{color}" t-att-data-color="color" t-att-data-index="el_index" t-att-data-id="el.id" t-attf-title="Tag color: #{colornames[color]}">
-            <span class="o_badge_text"><span role="img" t-attf-aria-label="Tag color: #{colornames[color]}"/><t t-esc="el.display_name"/></span>
-            <a t-if="!readonly" class="fa fa-times o_delete" title="Delete" aria-label="Delete"/>
-        </button>
+        <div class="dropdown">
+            <button t-attf-class="badge badge-pill dropdown-toggle o-no-caret o_tag_color_#{color}" data-toggle="dropdown" t-att-data-color="color" t-att-data-index="el_index" t-att-data-id="el.id" t-attf-title="Tag color: #{colornames[color]}">
+                <span class="o_badge_text" t-att-title="el.display_name"><span role="img" t-attf-aria-label="Tag color: #{colornames[color]}"/><t t-esc="el.display_name"/></span>
+                <a t-if="!readonly" class="fa fa-times o_delete" title="Delete" aria-label="Delete"/>
+            </button>
+        </div>
     </t>
 </t>
 <t t-name="FieldMany2ManyTag.colorpicker">
@@ -897,9 +888,11 @@
 <t t-name="FieldStatus.content">
     <t t-if="selection_folded.length">
         <button type="button" class="btn o_arrow_button btn-secondary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">More</button>
-        <div class="dropdown-menu o-status-more" role="menu">
+        <div class="dropdown-menu" role="menu">
             <t t-foreach="selection_folded" t-as="i">
-                <t t-call="FieldStatus.content.button"/>
+                <t t-call="FieldStatus.content.button">
+                    <t t-set="is_dropdown" t-value="true"/>
+                </t>
             </t>
         </div>
     </t>
@@ -910,15 +903,15 @@
 <t t-name="FieldStatus.content.button">
     <t t-set="disabled" t-value="!clickable"/>
     <button type="button" t-att-data-value="i.id" disabled="disabled" title="Current state" aria-pressed="true"
-        class="btn o_arrow_button btn-primary disabled" t-if="i.selected" aria-current="step">
+        t-attf-class="btn o_arrow_button btn-primary disabled #{is_dropdown ? 'dropdown-item bg-primary text-white': ''}" t-if="i.selected" aria-current="step">
         <t t-esc="i.display_name" role="img" t-attf-aria-label="#{i.display_name} is current state"/>
     </button>
     <button type="button" t-att-data-value="i.id" disabled="disabled" title="Not active state" aria-pressed="false"
-        class="btn o_arrow_button btn-secondary disabled" t-if="!i.selected and disabled">
+        t-attf-class="btn o_arrow_button btn-secondary disabled #{is_dropdown ? 'dropdown-item': ''}" t-if="!i.selected and disabled">
         <t t-esc="i.display_name" role="img" t-attf-aria-label="#{i.display_name} is not current state"/>
     </button>
     <button type="button" t-att-data-value="i.id" title="Not active state, click to change it" aria-pressed="false"
-        class="btn o_arrow_button btn-secondary" t-if="!i.selected and !disabled">
+        t-attf-class="btn o_arrow_button btn-secondary #{is_dropdown ? 'dropdown-item': ''}" t-if="!i.selected and !disabled">
         <t t-esc="i.display_name" role="img" t-attf-aria-label="Click to change current state to #{i.display_name}"/>
     </button>
 </t>
@@ -1127,6 +1120,72 @@
     </div>
 </t>
 
+<div t-name="web.TimeRangeMenu" class="btn-group o_dropdown">
+    <button class="o_dropdown_toggler_btn btn btn-secondary dropdown-toggle o_time_range_menu_button" data-toggle="dropdown"
+        aria-expanded="false" tabindex="-1">
+        <span class="fa fa-calendar"/> Time Ranges <span class="caret"/>
+    </button>
+    <div class="dropdown-menu o_dropdown_menu o_time_range_menu" role="menu">
+        <div class="dropdown-item-text">
+            <label for="date_field_selector">Date Field</label>
+            <select id="date_field_selector" class="o_input o_date_field_selector">
+                <t t-foreach="widget.dateFields" t-as="field">
+                    <t t-if="widget.dateField.name === field.name">
+                    <option t-att-value="field.name" selected="selected">
+                        <t t-esc="field.string"/>
+                    </option>
+                    </t>
+                    <t t-else="">
+                        <option t-att-value="field.name">
+                            <t t-esc="field.string"/>
+                        </option>
+                    </t>
+                </t>
+            </select>
+        </div>
+        <div class="dropdown-item-text">
+            <label for="time_range_selector">Date Range</label>
+            <select id="time_range_selector" class="o_input o_time_range_selector">
+                <t t-foreach="widget.periodOptions" t-as="option">
+                    <t t-if="widget.timeRangeId === option.optionId">
+                        <option t-att-value="option.optionId" selected="selected">
+                            <t t-esc="option.description"/>
+                        </option>
+                    </t>
+                    <t t-else="">
+                        <option t-att-value="option.optionId">
+                            <t t-esc="option.description"/>
+                        </option>
+                    </t>
+                </t>
+            </select>
+        </div>
+        <div class="dropdown-item-text">
+            <t t-set="isSelected" t-value="widget.comparisonIsSelected"/>
+            <div class="custom-control custom-checkbox">
+                <input type="checkbox" id="comparison_checkbox" class="custom-control-input o_comparison_checkbox" t-att-checked="isSelected ? 'checked' : undefined"/>
+                <label for="comparison_checkbox" class="custom-control-label">Compare To</label>
+            </div>
+            <select t-att-class="'o_input o_comparison_time_range_selector' + (widget.comparisonIsSelected ? '' : ' o_hidden')">
+                <t t-foreach="widget.comparisonOptions" t-as="option">
+                    <t t-if="widget.comparisonTimeRangeId === option.optionId">
+                        <option t-att-value="option.optionId" selected="selected">
+                            <t t-esc="option.description"/>
+                        </option>
+                    </t>
+                    <t t-else="">
+                        <option t-att-value="option.optionId">
+                            <t t-esc="option.description"/>
+                        </option>
+                    </t>
+                </t>
+            </select>
+        </div>
+        <div class="dropdown-item-text">
+            <button class="btn btn-primary o_apply_range" type="button">Apply</button>
+        </div>
+    </div>
+</div>
 
 
 <div t-name="SearchView" class="o_searchview" role="search" aria-autocomplete="list">
@@ -1493,7 +1552,7 @@
                 <li><i class="fa fa-check"></i> Mobile support</li>
                 <li><i class="fa fa-check"></i> Upgrade to future versions</li>
                 <li><i class="fa fa-check"></i> Bugfixes guarantee</li>
-                <li><a href="http://www.odoo.com/editions" target="_blank"><i class="fa fa-plus"></i> And more</a></li>
+                <li><a href="http://www.odoo.com/editions?utm_source=db&amp;utm_medium=enterprise" target="_blank"><i class="fa fa-plus"></i> And more</a></li>
             </ul>
         </div>
         <div class="col-6">
@@ -1518,7 +1577,7 @@
 </t>
 
 <t t-name="AttachDocument">
-    <button class="btn btn-secondary o_attachment_button">
+    <button t-attf-class="btn o_attachment_button #{widget.node.attrs.highlight?'btn-primary':'btn-secondary'}">
         <span class="o_attach_document"><t t-esc="widget.node.attrs.string"/></span>
         <span class="d-none">
             <t t-call="HiddenInputFile">

@@ -6,7 +6,7 @@
     'version': '1.0',
     'sequence': 130,
     'depends': ['base', 'mail'],
-    'summary': 'Schedule your meetings and send invitations',
+    'summary': 'Schedule employees meetings',
     'description': """
 This is a full-featured calendar system.
 ========================================
@@ -19,7 +19,6 @@ It supports:
 If you need to manage your meetings, you should install the CRM module.
     """,
     'category': 'Extra Tools',
-    'website': 'https://www.odoo.com/page/crm',
     'demo': [
         'data/calendar_demo.xml'
     ],

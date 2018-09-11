@@ -307,6 +307,73 @@ QUnit.module('Views', {
         assert.strictEqual(list.$('th:contains(Bar)').length, 1, "should contain Bar");
         assert.strictEqual(list.$('tr.o_group_header').length, 2, "should have 2 .o_group_header");
         assert.strictEqual(list.$('th.o_group_name').length, 2, "should have 2 .o_group_name");
+    });
+
+    QUnit.test('basic grouped list rendering 1 col without selector', function (assert) {
+        assert.expect(1);
+
+        var list = createView({
+            View: ListView,
+            model: 'foo',
+            data: this.data,
+            arch: '<tree ><field name="foo"/></tree>',
+            groupBy: ['bar'],
+            hasSelectors: false,
+        });
+
+        assert.strictEqual(list.$('.o_group_header:first').children().length, 1,
+        "group header should have exactly 1 column");
+        list.destroy();
+    });
+
+    QUnit.test('basic grouped list rendering 1 col with selector', function (assert) {
+        assert.expect(1);
+
+        var list = createView({
+            View: ListView,
+            model: 'foo',
+            data: this.data,
+            arch: '<tree ><field name="foo"/></tree>',
+            groupBy: ['bar'],
+            hasSelectors: true,
+        });
+
+        assert.strictEqual(list.$('.o_group_header:first').children().length, 1,
+            "group header should have exactly 1 column");
+        list.destroy();
+    });
+
+    QUnit.test('basic grouped list rendering 2 col without selector', function (assert) {
+        assert.expect(1);
+
+        var list = createView({
+            View: ListView,
+            model: 'foo',
+            data: this.data,
+            arch: '<tree ><field name="foo"/><field name="bar"/></tree>',
+            groupBy: ['bar'],
+            hasSelectors: false,
+        });
+
+        assert.strictEqual(list.$('.o_group_header:first').children().length, 2,
+            "group header should have exactly 2 column");
+        list.destroy();
+    });
+
+    QUnit.test('basic grouped list rendering 2 col with selector', function (assert) {
+        assert.expect(1);
+
+        var list = createView({
+            View: ListView,
+            model: 'foo',
+            data: this.data,
+            arch: '<tree ><field name="foo"/><field name="bar"/></tree>',
+            groupBy: ['bar'],
+            hasSelectors: true,
+        });
+
+        assert.strictEqual(list.$('.o_group_header:first').children().length, 2,
+        "group header should have exactly 2 column");
         list.destroy();
     });
 
@@ -663,6 +730,45 @@ QUnit.module('Views', {
         list.destroy();
     });
 
+    QUnit.test('selection is kept on render without reload', function (assert) {
+        assert.expect(5);
+
+        var list = createView({
+            View: ListView,
+            model: 'foo',
+            data: this.data,
+            groupBy: ['foo'],
+            viewOptions: {hasSidebar: true},
+            arch: '<tree>' +
+                    '<field name="foo"/>' +
+                    '<field name="int_field" sum="Sum"/>' +
+                '</tree>',
+        });
+
+        // open blip grouping and check all lines
+        list.$('.o_group_header:contains("blip (2)")').click();
+        list.$('.o_data_row input').click();
+        assert.strictEqual(true, list.sidebar.$el.is(':visible'),
+            "element checked so sidebar")
+
+        // open yop grouping and verify blip are still checked
+        list.$('.o_group_header:contains("yop (1)")').click()
+        assert.strictEqual(2, list.$('.o_data_row input:checked').length,
+            "opening a grouping does not uncheck others");
+        assert.strictEqual(true, list.sidebar.$el.is(':visible'),
+            "element checked so sidebar")
+
+        // close and open blip grouping and verify blip are unchecked
+        list.$('.o_group_header:contains("blip (2)")').click();
+        list.$('.o_group_header:contains("blip (2)")').click();
+        assert.strictEqual(0, list.$('.o_data_row input:checked').length,
+            "opening and closing a grouping uncheck its elements");
+        assert.strictEqual(false, list.sidebar.$el.is(':visible'),
+            "no element checked so no sidebar")
+
+        list.destroy();
+    });
+
     QUnit.test('aggregates are computed correctly', function (assert) {
         assert.expect(4);
 
@@ -701,7 +807,7 @@ QUnit.module('Views', {
             model: 'foo',
             data: this.data,
             groupBy: ['m2o'],
-            arch: '<tree editable="bottom"><field name="int_field" sum="Sum"/></tree>',
+            arch: '<tree editable="bottom"><field name="foo" /><field name="int_field" sum="Sum"/></tree>',
         });
 
         var $groupHeader1 = list.$('.o_group_header').filter(function (index, el) {
@@ -710,13 +816,13 @@ QUnit.module('Views', {
         var $groupHeader2 = list.$('.o_group_header').filter(function (index, el) {
             return $(el).data('group').res_id === 2;
         });
-        assert.strictEqual($groupHeader1.find('td:nth(1)').text(), "23", "first group total should be 23");
-        assert.strictEqual($groupHeader2.find('td:nth(1)').text(), "9", "second group total should be 9");
-        assert.strictEqual(list.$('tfoot td:nth(2)').text(), "32", "total should be 32");
+        assert.strictEqual($groupHeader1.find('td:last()').text(), "23", "first group total should be 23");
+        assert.strictEqual($groupHeader2.find('td:last()').text(), "9", "second group total should be 9");
+        assert.strictEqual(list.$('tfoot td:last()').text(), "32", "total should be 32");
 
         $groupHeader1.click();
         list.$('tbody .o_list_record_selector input').first().click();
-        assert.strictEqual(list.$('tfoot td:nth(2)').text(), "10",
+        assert.strictEqual(list.$('tfoot td:last()').text(), "10",
                         "total should be 10 as first record of first group is selected");
         list.destroy();
     });
@@ -768,7 +874,7 @@ QUnit.module('Views', {
             model: 'foo',
             data: this.data,
             groupBy: ['foo'],
-            arch: '<tree editable="bottom"><field name="int_field" sum="Sum"/></tree>',
+            arch: '<tree editable="bottom"><field name="foo" /><field name="int_field" sum="Sum"/></tree>',
             mockRPC: function (route, args) {
                 if (args.method === 'read_group') {
                     assert.step(args.kwargs.orderby || 'default order');
@@ -779,17 +885,17 @@ QUnit.module('Views', {
 
         assert.strictEqual(list.$('tbody .o_list_number').text(), '10517',
             "initial order should be 10, 5, 17");
-        assert.strictEqual(list.$('tfoot td:nth(2)').text(), '32', "total should be 32");
+        assert.strictEqual(list.$('tfoot td:last()').text(), '32', "total should be 32");
 
         list.$('.o_column_sortable').click(); // sort (int_field ASC)
-        assert.strictEqual(list.$('tfoot td:nth(2)').text(), '32', "total should still be 32");
+        assert.strictEqual(list.$('tfoot td:last()').text(), '32', "total should still be 32");
         assert.strictEqual(list.$('tbody .o_list_number').text(), '51017',
             "order should be 5, 10, 17");
 
         list.$('.o_column_sortable').click(); // sort (int_field DESC)
         assert.strictEqual(list.$('tbody .o_list_number').text(), '17105',
             "initial order should be 17, 10, 5");
-        assert.strictEqual(list.$('tfoot td:nth(2)').text(), '32', "total should still be 32");
+        assert.strictEqual(list.$('tfoot td:last()').text(), '32', "total should still be 32");
 
         assert.verifySteps(['default order', 'int_field ASC', 'int_field DESC']);
 
@@ -2154,13 +2260,15 @@ QUnit.module('Views', {
                     '<field name="foo" required="1"/>' +
                     '<field name="bar"/>' +
                 '</tree>',
-            services: [NotificationService.extend({
-                notify: function (params) {
-                    if (params.type === 'warning') {
-                        warnings++;
+            services: {
+                notification: NotificationService.extend({
+                    notify: function (params) {
+                        if (params.type === 'warning') {
+                            warnings++;
+                        }
                     }
-                }
-            })],
+                }),
+            },
         });
 
         // Start first line edition
@@ -3048,20 +3156,118 @@ QUnit.module('Views', {
         list.destroy();
     });
 
+    QUnit.test('result of consecutive resequences is correctly sorted', function (assert) {
+        assert.expect(9);
+        this.data = { // we want the data to be minimal to have a minimal test
+            foo: {
+                fields: {int_field: {string: "int_field", type: "integer", sortable: true}},
+                records: [
+                    {id: 1, int_field: 0},
+                    {id: 2, int_field: 1},
+                    {id: 3, int_field: 2},
+                    {id: 4, int_field: 3},
+                ]
+            }
+        };
+        var moves = 0;
+        var list = createView({
+            View: ListView,
+            model: 'foo',
+            data: this.data,
+            arch: '<tree>' +
+                    '<field name="int_field" widget="handle"/>' +
+                    '<field name="id"/>' +
+                  '</tree>',
+            mockRPC: function (route, args) {
+                if (route === '/web/dataset/resequence') {
+                    if (moves === 0) {
+                        assert.deepEqual(args, {
+                            model: "foo",
+                            ids: [4, 3],
+                            offset: 2,
+                            field: "int_field",
+                        });
+                    }
+                    if (moves === 1) {
+                        assert.deepEqual(args, {
+                            model: "foo",
+                            ids: [1, 4, 2, 3],
+                            field: "int_field",
+                        });
+                    }
+                    if (moves === 2) {
+                        assert.deepEqual(args, {
+                            model: "foo",
+                            ids: [2, 4],
+                            offset: 1,
+                            field: "int_field",
+                        });
+                    }
+                    if (moves === 3) {
+                        assert.deepEqual(args, {
+                            model: "foo",
+                            ids: [1, 4, 2, 3],
+                            field: "int_field",
+                        });
+                    }
+                    moves += 1;
+                }
+                return this._super.apply(this, arguments);
+            },
+        });
+        assert.strictEqual(list.$('tbody tr td.o_list_number').text(), '1234',
+            "default should be sorted by id");
+        testUtils.dragAndDrop(
+            list.$('.ui-sortable-handle').eq(3),
+            list.$('tbody tr').eq(2),
+            {position: 'top'}
+        );
+        assert.strictEqual(list.$('tbody tr td.o_list_number').text(), '1243',
+            "the int_field (sequence) should have been correctly updated");
+        testUtils.dragAndDrop(
+            list.$('.ui-sortable-handle').eq(2),
+            list.$('tbody tr').eq(1),
+            {position: 'top'}
+        );
+        assert.deepEqual(list.$('tbody tr td.o_list_number').text(), '1423',
+            "the int_field (sequence) should have been correctly updated");
+        testUtils.dragAndDrop(
+            list.$('.ui-sortable-handle').eq(1),
+            list.$('tbody tr').eq(3),
+            {position: 'top'}
+        );
+        assert.deepEqual(list.$('tbody tr td.o_list_number').text(), '1243',
+            "the int_field (sequence) should have been correctly updated");
+        testUtils.dragAndDrop(
+            list.$('.ui-sortable-handle').eq(2),
+            list.$('tbody tr').eq(1),
+            {position: 'top'}
+        );
+        assert.deepEqual(list.$('tbody tr td.o_list_number').text(), '1423',
+            "the int_field (sequence) should have been correctly updated");
+        list.destroy();
+    });
+
     QUnit.test('editable list with handle widget', function (assert) {
         assert.expect(12);
+
+        // resequence makes sense on a sequence field, not on arbitrary fields
+        this.data.foo.records[0].int_field = 0;
+        this.data.foo.records[1].int_field = 1;
+        this.data.foo.records[2].int_field = 2;
+        this.data.foo.records[3].int_field = 3;
 
         var list = createView({
             View: ListView,
             model: 'foo',
             data: this.data,
-            arch: '<tree editable="top">' +
+            arch: '<tree editable="top" default_order="int_field">' +
                     '<field name="int_field" widget="handle"/>' +
                     '<field name="amount" widget="float" digits="[5,0]"/>' +
                   '</tree>',
             mockRPC: function (route, args) {
                 if (route === '/web/dataset/resequence') {
-                    assert.strictEqual(args.offset, -4,
+                    assert.strictEqual(args.offset, 1,
                         "should write the sequence starting from the lowest current one");
                     assert.strictEqual(args.field, 'int_field',
                         "should write the right field as sequence");
@@ -3109,6 +3315,12 @@ QUnit.module('Views', {
     QUnit.test('editable list with handle widget with slow network', function (assert) {
         assert.expect(15);
 
+        // resequence makes sense on a sequence field, not on arbitrary fields
+        this.data.foo.records[0].int_field = 0;
+        this.data.foo.records[1].int_field = 1;
+        this.data.foo.records[2].int_field = 2;
+        this.data.foo.records[3].int_field = 3;
+
         var def = $.Deferred();
 
         var list = createView({
@@ -3121,7 +3333,7 @@ QUnit.module('Views', {
                   '</tree>',
             mockRPC: function (route, args) {
                 if (route === '/web/dataset/resequence') {
-                    assert.strictEqual(args.offset, -4,
+                    assert.strictEqual(args.offset, 1,
                         "should write the sequence starting from the lowest current one");
                     assert.strictEqual(args.field, 'int_field',
                         "should write the right field as sequence");

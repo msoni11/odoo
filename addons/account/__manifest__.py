@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
-    'name' : 'Invoicing Management',
+    'name' : 'Invoicing',
     'version' : '1.1',
     'summary': 'Invoices & Payments',
-    'sequence': 30,
+    'sequence': 15,
     'description': """
 Invoicing & Payments
 ====================
@@ -24,7 +24,6 @@ You could use this simplified accounting in case you work with an (external) acc
         'data/digest_data.xml',
         'views/account_menuitem.xml',
         'views/account_payment_view.xml',
-        'wizard/account_reconcile_view.xml',
         'wizard/account_unreconcile_view.xml',
         'wizard/account_move_reversal_view.xml',
         'views/account_view.xml',
@@ -62,6 +61,7 @@ You could use this simplified accounting in case you work with an (external) acc
         'views/tax_adjustments.xml',
         'wizard/wizard_tax_adjustments_view.xml',
         'views/res_config_settings_views.xml',
+        'views/account_invoice_import_wizard_view.xml',
         'views/account_journal_dashboard_view.xml',
         'views/account_portal_templates.xml',
         'report/account_report_payment_receipt_templates.xml',
@@ -73,11 +73,11 @@ You could use this simplified accounting in case you work with an (external) acc
         'views/res_users_views.xml',
         'data/service_cron_reverse.xml',
         'views/account_fiscal_year_view.xml',
-        'wizard/multi_compose_message_views.xml',
         'views/account_incoterms_view.xml',
         'data/account_incoterms_data.xml',
         'views/res_company_view.xml',
         'views/digest_views.xml',
+        'wizard/account_invoice_send_views.xml',
     ],
     'demo': [
         'demo/account_demo.xml',
@@ -86,7 +86,6 @@ You could use this simplified accounting in case you work with an (external) acc
         "static/src/xml/account_reconciliation.xml",
         "static/src/xml/account_payment.xml",
         "static/src/xml/account_report_backend.xml",
-        "static/src/xml/account_dashboard_setup_bar.xml",
     ],
     'installable': True,
     'application': True,

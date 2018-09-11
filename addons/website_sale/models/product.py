@@ -53,7 +53,7 @@ class ProductPricelist(models.Model):
 
 class ProductPublicCategory(models.Model):
     _name = "product.public.category"
-    _inherit = ["website.seo.metadata"]
+    _inherit = ["website.seo.metadata", "website.multi.mixin"]
     _description = "Website Product Category"
     _order = "sequence, name"
 
@@ -105,8 +105,8 @@ class ProductPublicCategory(models.Model):
 
 
 class ProductTemplate(models.Model):
-    _inherit = ["product.template", "website.seo.metadata", 'website.published.mixin', 'rating.mixin']
-    _order = 'website_published desc, website_sequence desc, name'
+    _inherit = ["product.template", "website.seo.metadata", 'website.published.multi.mixin', 'rating.mixin']
+    _order = 'is_published desc, website_sequence desc, name'
     _name = 'product.template'
     _mail_post_access = 'read'
 
@@ -170,6 +170,13 @@ class ProductTemplate(models.Model):
         else:
             return self.set_sequence_bottom()
 
+    def _default_website_meta(self):
+        res = super(ProductTemplate, self)._default_website_meta()
+        res['default_opengraph']['og:description'] = res['default_twitter']['twitter:description'] = self.description_sale
+        res['default_opengraph']['og:title'] = res['default_twitter']['twitter:title'] = self.name
+        res['default_opengraph']['og:image'] = res['default_twitter']['twitter:image'] = "/web/image/product.template/%s/image" % (self.id)
+        return res
+
     @api.multi
     def _compute_website_url(self):
         super(ProductTemplate, self)._compute_website_url()
@@ -179,6 +186,8 @@ class ProductTemplate(models.Model):
 
 class Product(models.Model):
     _inherit = "product.product"
+
+    website_id = fields.Many2one(related='product_tmpl_id.website_id')
 
     website_price = fields.Float('Website price', compute='_website_price', digits=dp.get_precision('Product Price'))
     website_public_price = fields.Float('Website public price', compute='_website_price', digits=dp.get_precision('Product Price'))

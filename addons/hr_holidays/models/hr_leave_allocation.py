@@ -248,7 +248,7 @@ class HolidaysAllocation(models.Model):
 
     @api.onchange('holiday_status_id')
     def _onchange_holiday_status_id(self):
-        self.date_to = self.holiday_status_id.validity_stop
+        self.date_to = datetime.combine(self.holiday_status_id.validity_stop, time.max)
 
         if self.accrual:
             self.number_of_days_temp = 0
@@ -288,9 +288,9 @@ class HolidaysAllocation(models.Model):
     def _check_leave_type_validity(self):
         for allocation in self:
             if allocation.holiday_status_id.validity_start and allocation.holiday_status_id.validity_stop:
-                vstart = fields.Datetime.from_string(allocation.holiday_status_id.validity_start)
-                vstop = fields.Datetime.from_string(allocation.holiday_status_id.validity_stop)
-                today = fields.Datetime.from_string(fields.Datetime.now())
+                vstart = allocation.holiday_status_id.validity_start
+                vstop = allocation.holiday_status_id.validity_stop
+                today = fields.Date.today()
 
                 if vstart > today or vstop < today:
                     raise UserError(_('You can allocate %s only between %s and %s') % (allocation.holiday_status_id.display_name,
@@ -466,13 +466,13 @@ class HolidaysAllocation(models.Model):
                 to_clean |= allocation
             elif allocation.state == 'confirm':
                 allocation.activity_schedule(
-                    'hr_holidays.mail_act_leave_allocation_approval', fields.Date.today(),
-                    user_id=allocation._get_responsible_for_approval().id)
+                    'hr_holidays.mail_act_leave_allocation_approval',
+                    user_id=allocation.sudo()._get_responsible_for_approval().id)
             elif allocation.state == 'validate1':
                 allocation.activity_feedback(['hr_holidays.mail_act_leave_allocation_approval'])
                 allocation.activity_schedule(
-                    'hr_holidays.mail_act_leave_allocation_second_approval', fields.Date.today(),
-                    user_id=allocation._get_responsible_for_approval().id)
+                    'hr_holidays.mail_act_leave_allocation_second_approval',
+                    user_id=allocation.sudo()._get_responsible_for_approval().id)
             elif allocation.state == 'validate':
                 to_do |= allocation
             elif allocation.state == 'refuse':
@@ -509,8 +509,9 @@ class HolidaysAllocation(models.Model):
             ref_action = self._notify_get_action_link('controller', controller='/allocation/refuse')
             hr_actions += [{'url': ref_action, 'title': _('Refuse')}]
 
+        holiday_user_group_id = self.env.ref('hr_holidays.group_hr_holidays_user').id
         new_group = (
-            'group_hr_holidays_user', lambda partner: bool(partner.user_ids) and any(user.has_group('hr_holidays.group_hr_holidays_user') for user in partner.user_ids), {
+            'group_hr_holidays_user', lambda pdata: pdata['type'] == 'user' and holiday_user_group_id in pdata['groups'], {
                 'actions': hr_actions,
             })
 

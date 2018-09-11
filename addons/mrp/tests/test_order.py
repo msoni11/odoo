@@ -59,7 +59,7 @@ class TestMrpOrder(TestMrpCommon):
         })
         inventory.action_validate()
 
-        test_date_planned = datetime.now() - timedelta(days=1)
+        test_date_planned = Dt.now() - timedelta(days=1)
         test_quantity = 2.0
         self.bom_1.routing_id = False
         man_order = self.env['mrp.production'].sudo(self.user_mrp_user).create({
@@ -76,7 +76,7 @@ class TestMrpOrder(TestMrpCommon):
 
         # check production move
         production_move = man_order.move_finished_ids
-        self.assertEqual(production_move.date, Dt.to_string(test_date_planned))
+        self.assertEqual(production_move.date, test_date_planned)
         self.assertEqual(production_move.product_id, self.product_4)
         self.assertEqual(production_move.product_uom, man_order.product_uom_id)
         self.assertEqual(production_move.product_qty, man_order.product_qty)
@@ -85,7 +85,7 @@ class TestMrpOrder(TestMrpCommon):
 
         # check consumption moves
         for move in man_order.move_raw_ids:
-            self.assertEqual(move.date, Dt.to_string(test_date_planned))
+            self.assertEqual(move.date, test_date_planned)
         first_move = man_order.move_raw_ids.filtered(lambda move: move.product_id == self.product_2)
         self.assertEqual(first_move.product_qty, test_quantity / self.bom_1.product_qty * self.product_4.uom_id.factor_inv * 2)
         first_move = man_order.move_raw_ids.filtered(lambda move: move.product_id == self.product_1)
@@ -585,6 +585,46 @@ class TestMrpOrder(TestMrpCommon):
         self.assertEqual(sum(ml_to_shelf_1.mapped('qty_done')), 3.0, '3 units should be took from shelf1 as reserved.')
         self.assertEqual(sum(ml_to_shelf_2.mapped('qty_done')), 3.0, '3 units should be took from shelf2 as reserved.')
         self.assertEqual(move_1.quantity_done, 13, 'You should have used the tem units.')
+
+        mo.button_mark_done()
+        self.assertEqual(mo.state, 'done', "Production order should be in done state.")
+
+    def test_product_produce_4(self):
+        """ Possibility to produce with a given raw material in multiple locations. """
+        self.stock_location = self.env.ref('stock.stock_location_stock')
+        self.stock_shelf_1 = self.env.ref('stock.stock_location_components')
+        self.stock_shelf_2 = self.env.ref('stock.stock_location_14')
+        mo, _, p_final, p1, p2 = self.generate_mo(qty_final=1, qty_base_1=5)
+
+        self.env['stock.quant']._update_available_quantity(p1, self.stock_shelf_1, 2)
+        self.env['stock.quant']._update_available_quantity(p1, self.stock_shelf_2, 3)
+        self.env['stock.quant']._update_available_quantity(p2, self.stock_location, 1)
+
+        mo.action_assign()
+        ml_p1 = mo.move_raw_ids.filtered(lambda x: x.product_id == p1).mapped('move_line_ids')
+        ml_p2 = mo.move_raw_ids.filtered(lambda x: x.product_id == p2).mapped('move_line_ids')
+        self.assertEqual(len(ml_p1), 2)
+        self.assertEqual(len(ml_p2), 1)
+
+        # Add some quantity already done to force an extra move line to be created
+        ml_p1[0].qty_done = 1.0
+
+        # Produce baby!
+        product_produce = self.env['mrp.product.produce'].with_context({
+            'active_id': mo.id,
+            'active_ids': [mo.id],
+        }).create({
+            'product_qty': 1.0,
+        })
+        product_produce._onchange_product_qty()
+        product_produce.do_produce()
+
+        ml_p1 = mo.move_raw_ids.filtered(lambda x: x.product_id == p1).mapped('move_line_ids')
+        self.assertEqual(len(ml_p1), 4)
+        for ml in ml_p1:
+            self.assertIn(ml.qty_done, [1.0, 2.0], 'Quantity done should be 1.0, 2.0 or 3.0')
+        self.assertEqual(sum(ml_p1.mapped('qty_done')), 6.0, 'Total qty consumed should be 6.0')
+        self.assertEqual(sum(ml_p1.mapped('product_uom_qty')), 5.0, 'Total qty reserved should be 5.0')
 
         mo.button_mark_done()
         self.assertEqual(mo.state, 'done', "Production order should be in done state.")

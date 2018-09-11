@@ -97,12 +97,9 @@
                 margin: 2px 0 5px;
             }
 
-            .o_mail_template {
-                display: inline-block;
-                margin: 0px 0px 4px 4px;
-                padding: 1px 6px;
+            .o_activity_template_preview,.o_activity_template_send {
+                font-weight: bold;
                 color: $o-brand-primary;
-                border: 1px solid $o-brand-primary;
                 cursor: pointer;
                 &:hover:not(.active) {
                     color: darken($o-brand-primary, 15%);
@@ -147,10 +144,13 @@
 }
 
 /* Kanban View */
-.o_kanban_record {
+.o_kanban_record{
     .o_kanban_inline_block {
         display: inline-block;
     }
+}
+
+.o_kanban_record, .o_view_controller{
     .o_mail_activity {
         .o_activity_btn {
             span.fa {
@@ -162,18 +162,30 @@
 
         .o_activity_link_kanban {
             visibility: hidden;
+            @include media-breakpoint-down(sm) {
+                visibility: visible;
+            }
         }
 
-        ul.o_activity {
-            width: 290px;
+        .o_activity_template_preview,.o_activity_template_send {
+            font-weight: bold;
+            color: $o-brand-primary;
+            cursor: pointer;
+            &:hover:not(.active) {
+                color: darken($o-brand-primary, 15%);
+                border-color: darken($o-brand-primary, 15%);
+            }
+        }
+
+        div.o_activity {
+            min-width: 290px;
             padding: 0px 0px;
 
-            & > li:last-child {
+            > :last-child {
                 background-color: $o-brand-lightsecondary;
-                color: gray('900');
                 line-height: 3em;
             }
-            li > ul.o_activity_log {
+            ul.o_activity_log {
                 max-height: 300px;
                 overflow-y: auto;
                 color: $body-color;
@@ -188,7 +200,7 @@
                         background-color: $o-brand-lightsecondary;
                     }
 
-                    &.o_schedule_activity {
+                    &.o_edit_activity {
                         padding: 8px 10px 8px 0px;
                         vertical-align: middle;
                         &:hover {
@@ -202,7 +214,6 @@
                             width: 85%;
                             padding: 0px 5px 0px 10px;
                             white-space: nowrap;
-                            overflow: hidden;
                             text-overflow: ellipsis;
                         }
                     }

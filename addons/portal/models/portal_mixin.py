@@ -58,7 +58,7 @@ class PortalMixin(models.AbstractModel):
         if signup_partner and hasattr(self, 'partner_id') and self.partner_id:
             params.update(self.partner_id.signup_get_auth_param()[self.partner_id.id])
 
-        return '/mail/view?' if redirect else self.access_url + url_encode(params)
+        return '%s?%s' % ('/mail/view' if redirect else self.access_url, url_encode(params))
 
     @api.multi
     def _notify_get_groups(self, message, groups):
@@ -73,7 +73,7 @@ class PortalMixin(models.AbstractModel):
             access_link = self._notify_get_action_link('view', **additional_params)
 
             new_group = [
-                ('portal_customer', lambda partner: partner.id == customer.id, {
+                ('portal_customer', lambda pdata: pdata['id'] == customer.id, {
                     'has_button_access': False,
                     'button_access': {
                         'url': access_link,

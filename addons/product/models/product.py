@@ -572,6 +572,16 @@ class ProductProduct(models.Model):
         )
         return super(ProductProduct, self).get_empty_list_help(help)
 
+    def get_product_multiline_description_sale(self):
+        """ Compute a multiline description of this product, in the context of sales
+                (do not use for purchases or other display reasons that don't intend to use "description_sale").
+            It will often be used as the default description of a sale order line referencing this product.
+        """
+        name = self.display_name
+        if self.description_sale:
+            name += '\n' + self.description_sale
+        return name
+
 
 class ProductPackaging(models.Model):
     _name = "product.packaging"
@@ -603,7 +613,7 @@ class SupplierInfo(models.Model):
     sequence = fields.Integer(
         'Sequence', default=1, help="Assigns the priority to the list of product vendor.")
     product_uom = fields.Many2one(
-        'uom.uom', 'Vendor Unit of Measure',
+        'uom.uom', 'Unit of Measure',
         readonly="1", related='product_tmpl_id.uom_po_id',
         help="This comes from the product form.")
     min_qty = fields.Float(

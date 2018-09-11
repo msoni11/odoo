@@ -16,7 +16,7 @@ from lxml import etree
 from lxml.builder import E
 import passlib.context
 
-from odoo import api, fields, models, tools, SUPERUSER_ID, _
+from odoo import api, fields, models, tools, SUPERUSER_ID, ADMINUSER_ID, _
 from odoo.exceptions import AccessDenied, AccessError, UserError, ValidationError
 from odoo.http import request
 from odoo.osv import expression
@@ -306,8 +306,9 @@ class Users(models.Model):
         instead.
         """
         """ Override this method to plug additional authentication methods"""
+        assert password
         self.env.cr.execute(
-            'SELECT password FROM res_users WHERE id=%s',
+            "SELECT COALESCE(password, '') FROM res_users WHERE id=%s",
             [self.env.user.id]
         )
         [hashed] = self.env.cr.fetchone()
@@ -362,6 +363,19 @@ class Users(models.Model):
     def onchange_parent_id(self):
         return self.mapped('partner_id').onchange_parent_id()
 
+    def _read_from_database(self, field_names, inherited_field_names=[]):
+        super(Users, self)._read_from_database(field_names, inherited_field_names)
+        canwrite = self.check_access_rights('write', raise_exception=False)
+        if not canwrite and set(USER_PRIVATE_FIELDS).intersection(field_names):
+            for record in self:
+                for f in USER_PRIVATE_FIELDS:
+                    try:
+                        record._cache[f]
+                        record._cache[f] = '********'
+                    except Exception:
+                        # skip SpecialValue (e.g. for missing record or access right)
+                        pass
+
     @api.multi
     @api.constrains('company_id', 'company_ids')
     def _check_company(self):
@@ -392,17 +406,7 @@ class Users(models.Model):
                 # safe fields only, so we read as super-user to bypass access rights
                 self = self.sudo()
 
-        result = super(Users, self).read(fields=fields, load=load)
-
-        canwrite = self.env['ir.model.access'].check('res.users', 'write', False)
-        if not canwrite:
-            for vals in result:
-                if vals['id'] != self._uid:
-                    for key in USER_PRIVATE_FIELDS:
-                        if key in vals:
-                            vals[key] = '********'
-
-        return result
+        return super(Users, self).read(fields=fields, load=load)
 
     @api.model
     def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
@@ -422,7 +426,7 @@ class Users(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        users = super(Users, self).create(vals_list)
+        users = super(Users, self.with_context(default_customer=False)).create(vals_list)
         for user in users:
             user.partner_id.active = user.active
             if user.partner_id.company_id:
@@ -542,6 +546,10 @@ class Users(models.Model):
         # extra records will be deleted by the periodical garbage collection
         self.env['res.users.log'].create({}) # populated by defaults
 
+    @api.model
+    def _get_login_domain(self, login):
+        return [('login', '=', login)]
+
     @classmethod
     def _login(cls, db, login, password):
         if not password:
@@ -551,10 +559,9 @@ class Users(models.Model):
             with cls.pool.cursor() as cr:
                 self = api.Environment(cr, SUPERUSER_ID, {})[cls._name]
                 with self._assert_can_auth():
-                    user = self.search([('login', '=', login)])
+                    user = self.search(self._get_login_domain(login))
                     if not user:
                         raise AccessDenied()
-
                     user = user.sudo(user.id)
                     user._check_credentials(password)
                     user._update_last_login()
@@ -578,7 +585,7 @@ class Users(models.Model):
                relevant environment attributes
         """
         uid = cls._login(db, login, password)
-        if uid == SUPERUSER_ID:
+        if uid == ADMINUSER_ID:
             # Successfully logged in as admin!
             # Attempt to guess the web base url...
             if user_agent_env and user_agent_env.get('base_location'):
@@ -688,7 +695,7 @@ class Users(models.Model):
         :return: True if the current user is a member of the group with the
            given external ID (XML ID), else False.
         """
-        assert group_ext_id and '.' in group_ext_id, "External ID must be fully qualified"
+        assert group_ext_id and '.' in group_ext_id, "External ID '%s' must be fully qualified" % group_ext_id
         module, ext_id = group_ext_id.split('.')
         self._cr.execute("""SELECT 1 FROM res_groups_users_rel WHERE uid=%s AND gid IN
                             (SELECT res_id FROM ir_model_data WHERE module=%s AND name=%s)""",

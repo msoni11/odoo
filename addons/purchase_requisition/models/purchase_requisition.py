@@ -119,7 +119,7 @@ class PurchaseRequisition(models.Model):
     def action_in_progress(self):
         self.ensure_one()
         if not all(obj.line_ids for obj in self):
-            raise UserError(_('You cannot confirm agreement because there is no product line.'))
+            raise UserError(_("You cannot confirm agreement '%s' because there is no product line.") % self.name)
         if self.type_id.quantity_copy == 'none' and self.vendor_id:
             for requisition_line in self.line_ids:
                 if requisition_line.price_unit <= 0.0:
@@ -280,7 +280,7 @@ class PurchaseRequisitionLine(models.Model):
             'product_qty': product_qty,
             'price_unit': price_unit,
             'taxes_id': [(6, 0, taxes_ids)],
-            'date_planned': requisition.schedule_date or fields.Date.today(),
+            'date_planned': requisition.schedule_date or fields.Datetime.now(),
             'account_analytic_id': self.account_analytic_id.id,
             'analytic_tag_ids': self.analytic_tag_ids.ids,
             'move_dest_ids': self.move_dest_id and [(4, self.move_dest_id.id)] or []
@@ -291,6 +291,7 @@ class PurchaseOrder(models.Model):
     _inherit = "purchase.order"
 
     requisition_id = fields.Many2one('purchase.requisition', string='Purchase Agreement', copy=False)
+    is_quantity_copy = fields.Selection(related='requisition_id.is_quantity_copy')
 
     @api.onchange('requisition_id')
     def _onchange_requisition_id(self):

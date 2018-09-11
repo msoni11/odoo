@@ -11,7 +11,6 @@ var testUtils = require('web.test_utils');
 var createDiscuss = mailTestUtils.createDiscuss;
 
 QUnit.module('mail', {}, function () {
-
 QUnit.module('Discuss', {
     beforeEach: function () {
         // patch _.debounce and _.throttle to be fast and synchronous
@@ -44,9 +43,15 @@ QUnit.module('Discuss', {
                         string: "Need Action",
                         type: 'boolean',
                     },
+                    needaction_partner_ids: {
+                        string: "Partners with Need Action",
+                        type: 'many2many',
+                        relation: 'res.partner',
+                    },
                     starred_partner_ids: {
-                        string: "partner ids",
-                        type: 'integer',
+                        string: "Favorited By",
+                        type: 'many2many',
+                        relation: 'res.partner',
                     },
                     model: {
                         string: "Related Document model",
@@ -146,7 +151,6 @@ QUnit.test('@ mention in channel', function (assert) {
     assert.expect(34);
     var done = assert.async();
 
-    var bus = this.services[1].prototype.bus;
     var fetchListenersDef = $.Deferred();
     var receiveMessageDef = $.Deferred();
 
@@ -160,6 +164,7 @@ QUnit.test('@ mention in channel', function (assert) {
         },
     };
 
+    var objectDiscuss;
     createDiscuss({
         id: 1,
         context: {},
@@ -181,8 +186,8 @@ QUnit.test('@ mention in channel', function (assert) {
                     body: args.kwargs.body,
                     channel_ids: [1],
                 };
-                var notification = [[false, 'mail.channel'], data];
-                bus.trigger('notification', [notification]);
+                var notification = [[false, 'mail.channel', 1], data];
+                objectDiscuss.call('bus_service', 'trigger', 'notification', [notification]);
                 receiveMessageDef.resolve();
                 return $.when(42);
             }
@@ -190,6 +195,8 @@ QUnit.test('@ mention in channel', function (assert) {
         },
     })
     .then(function (discuss) {
+        objectDiscuss = discuss;
+
         var $general = discuss.$('.o_mail_discuss_sidebar')
                         .find('.o_mail_discuss_item[data-thread-id=1]');
         assert.strictEqual($general.length, 1,
@@ -202,7 +209,6 @@ QUnit.test('@ mention in channel', function (assert) {
         var $input = discuss.$('textarea.o_composer_text_field').first();
         assert.ok($input.length, "should display a composer input");
 
-        // Simulate '@' typed by user with mocked Window.getSelection
         // Note: focus is needed in order to trigger rpc 'channel_fetch_listeners'
         $input.focus();
         $input.val("@");
@@ -307,7 +313,6 @@ QUnit.test('@ mention in channel', function (assert) {
                         assert.strictEqual(discuss.$('.o_thread_message_content a').text(),
                             "@Admin", "should have correct mention link in the message content");
 
-                        // Restore window.getSelection
                         discuss.destroy();
                         done();
                 });
@@ -358,7 +363,7 @@ QUnit.test('no crash focusout emoji button', function (assert) {
 });
 
 QUnit.test('older messages are loaded on scroll', function (assert) {
-    assert.expect(3);
+    assert.expect(10);
     var done = assert.async();
 
     var fetchCount = 0;
@@ -392,10 +397,15 @@ QUnit.test('older messages are loaded on scroll', function (assert) {
         services: this.services,
         mockRPC: function (route, args) {
             if (args.method === 'message_fetch') {
+                assert.step(args.method);
                 fetchCount++;
                 // 1st fetch: inbox initial fetch
                 // 2nd fetch: general initial fetch
                 // 3rd fetch: general load more
+                if (fetchCount === 1) {
+                    assert.strictEqual(args.kwargs.limit, 30,
+                        "should ask to fetch 30 messages at most");
+                }
                 if (fetchCount === 3) {
                     loadMoreDef.resolve();
                 }
@@ -403,12 +413,19 @@ QUnit.test('older messages are loaded on scroll', function (assert) {
             return this._super.apply(this, arguments);
         },
     }).then(function (discuss) {
+
+        assert.verifySteps(['message_fetch'],
+            "should fetch messages once for needaction messages (Inbox)");
+
         var $general = discuss.$('.o_mail_discuss_item[data-thread-id=1]');
         assert.strictEqual($general.length, 1,
             "should have a channel item with id 1");
 
         // switch to 'general'
         $general.click();
+
+        assert.verifySteps(['message_fetch', 'message_fetch'],
+            "should fetch a second time for general channel messages (30 last messages)");
 
         assert.strictEqual(discuss.$('.o_thread_message').length, 30,
             "should display the 30 messages");
@@ -419,6 +436,8 @@ QUnit.test('older messages are loaded on scroll', function (assert) {
         loadMoreDef
             .then(concurrency.delay.bind(concurrency, 0))
             .then(function () {
+                assert.verifySteps(['message_fetch', 'message_fetch', 'message_fetch'],
+                    "should fetch a third time for general channel messages (5 remaining messages)");
                 assert.strictEqual(discuss.$('.o_thread_message').length, 35,
                     "all messages should now be loaded");
 
@@ -432,7 +451,6 @@ QUnit.test('"Unstar all" button should reset the starred counter', function (ass
     assert.expect(2);
     var done = assert.async();
 
-    var bus = this.services[1].prototype.bus;
     var messageData = [];
     _.each(_.range(1, 41), function (num) {
         messageData.push({
@@ -458,6 +476,7 @@ QUnit.test('"Unstar all" button should reset the starred counter', function (ass
     };
     this.data['mail.message'].records = messageData;
 
+    var objectDiscuss;
     createDiscuss({
         id: 1,
         context: {},
@@ -472,7 +491,7 @@ QUnit.test('"Unstar all" button should reset the starred counter', function (ass
                     type: 'toggle_star',
                 };
                 var notification = [[false, 'res.partner'], data];
-                bus.trigger('notification', [notification]);
+                objectDiscuss.call('bus_service', 'trigger', 'notification', [notification]);
                 return $.when(42);
             }
             return this._super.apply(this, arguments);
@@ -480,6 +499,8 @@ QUnit.test('"Unstar all" button should reset the starred counter', function (ass
         session: {partner_id: 1},
     })
     .then(function (discuss) {
+        objectDiscuss = discuss;
+
         var $starred = discuss.$('.o_mail_discuss_sidebar').find('.o_mail_mailbox_title_starred');
         var $starredCounter = $('.o_mail_mailbox_title_starred > .o_mail_sidebar_needaction');
 
@@ -617,14 +638,12 @@ QUnit.test('confirm dialog when administrator leave (not chat) channel', functio
         discuss.destroy();
         done();
     });
-
 });
 
 QUnit.test('convert emoji sources to unicodes on message_post', function (assert) {
     assert.expect(2);
     var done = assert.async();
 
-    var bus = this.services[1].prototype.bus;
     var receiveMessageDef = $.Deferred();
 
     this.data.initMessaging = {
@@ -637,6 +656,7 @@ QUnit.test('convert emoji sources to unicodes on message_post', function (assert
         },
     };
 
+    var objectDiscuss;
     createDiscuss({
         id: 1,
         context: {},
@@ -653,8 +673,8 @@ QUnit.test('convert emoji sources to unicodes on message_post', function (assert
                     body: args.kwargs.body,
                     channel_ids: [1],
                 };
-                var notification = [[false, 'mail.channel'], data];
-                bus.trigger('notification', [notification]);
+                var notification = [[false, 'mail.channel', 1], data];
+                objectDiscuss.call('bus_service', 'trigger', 'notification', [notification]);
                 receiveMessageDef.resolve();
                 return $.when(42);
             }
@@ -662,6 +682,8 @@ QUnit.test('convert emoji sources to unicodes on message_post', function (assert
         },
     })
     .then(function (discuss) {
+        objectDiscuss= discuss;
+
         var $general = discuss.$('.o_mail_discuss_sidebar')
                         .find('.o_mail_discuss_item[data-thread-id=1]');
 
@@ -683,8 +705,96 @@ QUnit.test('convert emoji sources to unicodes on message_post', function (assert
                 discuss.destroy();
                 done();
         });
+    });
+});
+
+QUnit.test('mark all messages as read from Inbox', function (assert) {
+    var done = assert.async();
+    assert.expect(9);
+
+    this.data['mail.message'].records = [{
+        author_id: [5, 'Demo User'],
+        body: '<p>test 1</p>',
+        id: 1,
+        needaction: true,
+        needaction_partner_ids: [3],
+    }, {
+        author_id: [6, 'Test User'],
+        body: '<p>test 2</p>',
+        id: 2,
+        needaction: true,
+        needaction_partner_ids: [3],
+    }];
+
+    this.data.initMessaging = {
+        needaction_inbox_counter: 2,
+    };
+
+    var markAllReadDef = $.Deferred();
+    var objectDiscuss;
+
+    createDiscuss({
+        id: 1,
+        context: {},
+        params: {},
+        data: this.data,
+        services: this.services,
+        session: { partner_id: 3 },
+        mockRPC: function (route, args) {
+            if (args.method === 'mark_all_as_read') {
+                _.each(this.data['mail.message'].records, function (message) {
+                    message.needaction = false;
+                });
+                var notificationData = {
+                    type: 'mark_as_read',
+                    message_ids: [1, 2],
+                };
+                var notification = [[false, 'res.partner', 3], notificationData];
+                objectDiscuss.call('bus_service', 'trigger', 'notification', [notification]);
+                markAllReadDef.resolve();
+                return $.when();
+            }
+            return this._super.apply(this, arguments);
+        },
+    })
+    .then(function (discuss) {
+        objectDiscuss = discuss;
+
+        var $inbox = discuss.$('.o_mail_discuss_item[data-thread-id="mailbox_inbox"]');
+        assert.strictEqual($inbox.length, 1,
+            "there should be an 'Inbox' item in Discuss sidebar");
+        assert.strictEqual($inbox.find('.o_mail_sidebar_needaction').text().trim(), "2",
+            "the mailbox counter of 'Inbox' should be 2");
+        assert.ok($inbox.hasClass('o_active'),
+            "'Inbox' should be the currently active thread");
+        assert.strictEqual(discuss.$('.o_thread_message').length, 2,
+            "there should be 2 messages in inbox");
+
+        var $markAllReadButton = $('.o_mail_discuss_button_mark_all_read');
+        assert.strictEqual($markAllReadButton.length, 1,
+            "there should be a 'Mark All As Read' button");
+        assert.strictEqual($markAllReadButton.attr('style'),
+            'display: inline-block;',
+            "the 'Mark All As Read' button should be visible");
+        assert.notOk($markAllReadButton.prop('disabled'),
+            "the 'Mark All As Read' button should not be disabled");
+
+        $markAllReadButton.click();
+
+        markAllReadDef.then(function () {
+            // immediately jump to end of the fadeout animation on messages
+            $inbox = discuss.$('.o_mail_discuss_item[data-thread-id="mailbox_inbox"]');
+            discuss.$('.o_thread_message').stop(false, true);
+            assert.strictEqual($inbox.find('.o_mail_sidebar_needaction').text().trim(), "0",
+                "the mailbox counter of 'Inbox' should have reset to 0");
+            assert.strictEqual(discuss.$('.o_thread_message').length, 0,
+                "there should no message in inbox anymore");
+
+            discuss.destroy();
+            done();
         });
     });
 });
 
+});
 });

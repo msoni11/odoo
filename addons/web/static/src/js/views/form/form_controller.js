@@ -21,6 +21,8 @@ var FormController = BasicController.extend({
         toggle_column_order: '_onToggleColumnOrder',
         focus_control_button: '_onFocusControlButton',
         form_dialog_discarded: '_onFormDialogDiscarded',
+        swipe_left: '_onSwipeLeft',
+        swipe_right: '_onSwipeRight',
     }),
     /**
      * @override
@@ -597,8 +599,10 @@ var FormController = BasicController.extend({
             fields_view: data.fields_view,
             model: this.model,
             on_saved: data.on_saved,
+            on_remove: data.on_remove,
             parentID: data.parentID,
             readonly: data.readonly,
+            deletable: data.deletable,
             recordID: record && record.id,
             res_id: record && record.res_id,
             res_model: data.field.relation,
@@ -620,7 +624,9 @@ var FormController = BasicController.extend({
             context: event.data.context,
             fields_view: event.data.fields_view,
             on_saved: event.data.on_saved,
+            on_remove: event.data.on_remove,
             readonly: event.data.readonly,
+            deletable: event.data.deletable,
             res_id: record.res_id,
             res_model: record.model,
             title: _t("Open: ") + event.data.string,
@@ -639,6 +645,30 @@ var FormController = BasicController.extend({
         this.saveRecord().always(function () {
             self._enableButtons();
         });
+    },
+    /**
+     * Called when user swipes left. Move to next record.
+     *
+     * @private
+     * @param {OdooEvent} ev
+     */
+    _onSwipeLeft: function (ev) {
+        ev.stopPropagation();
+        if (this.pager) {
+            this.pager.next();
+        }
+    },
+    /**
+     * Called when user swipes right. Move to previous record.
+     *
+     * @private
+     * @param {OdooEvent} ev
+     */
+    _onSwipeRight: function (ev) {
+        ev.stopPropagation();
+        if (this.pager) {
+            this.pager.previous();
+        }
     },
     /**
      * This method is called when someone tries to sort a column, most likely

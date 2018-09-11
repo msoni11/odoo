@@ -193,14 +193,21 @@
             <field name="arch" type="xml">
                 <page name="sales_purchases" position="after">
                     <page string="Invoicing" name="accounting" attrs="{'invisible': [('is_company','=',False),('parent_id','!=',False)]}" groups="account.group_account_invoice">
-                        <group>                    
+                        <group>
                             <group string="Bank Accounts" name="banks" groups="account.group_account_invoice">
                                 <field name="bank_ids" nolabel="1">
                                     <tree editable="bottom">
+                                        <field name="sequence" widget="handle"/>
                                         <field name="bank_id"/>
                                         <field name="acc_number"/>
                                     </tree>
                                 </field>
+                                <button type="action" class="btn-link"
+                                    name="%(base.action_res_partner_bank_account_form)d"
+                                    context="{'search_default_partner_id': active_id, 'default_partner_id': active_id}"
+                                    string="View accounts detail"
+                                    colspan="2"
+                                />
                             </group>
                             <group string="Accounting Entries" name="accounting_entries" groups="account.group_account_user">
                                 <field name="currency_id" invisible="1"/>

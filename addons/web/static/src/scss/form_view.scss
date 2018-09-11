@@ -72,10 +72,11 @@
             display: none!important;
         }
 
-        .o_row, .o_row > div {
-            display: inline-block;
+        .o_row:not(.o_row_readonly) {
+            &, & > div {
+                display: inline-block;
+            }
         }
-
     }
 
     .o_form_uri {
@@ -174,7 +175,6 @@
             flex-flow: row-reverse wrap-reverse;
             align-self: stretch;
             align-items: stretch;
-            overflow-x: hidden; // to prevent horizontal scroll due to last arrow
 
             > .o_arrow_button {
                 min-height: $o-statusbar-height;
@@ -189,6 +189,7 @@
 
                 &:first-child {
                     padding-right: $o-horizontal-padding; // Compensate container padding
+                    overflow-x: hidden; // to prevent horizontal scroll due to last arrow
                 }
                 &:last-child {
                     padding-left: $o-horizontal-padding - 1;
@@ -206,7 +207,7 @@
                     border-left: 1px solid gray('300');
                 }
 
-                &:before, &:after {
+                &:before, &:not(:first-child):after {
                     content: " ";
                     display: block;
                     @include o-position-absolute(0, -$o-statusbar-arrow-width + 1);
@@ -245,20 +246,8 @@
                         border-left-color: gray('200');
                     }
                 }
-
-                .caret {
-                    margin-top: -2px;
-                }
             }
 
-            .o-status-more {
-                @include o-position-absolute(100%, 0);
-                min-width: 100px;
-                > li > button {
-                    width: 100%;
-                    text-align: left;
-                }
-            }
         }
 
         // Touch device mode
@@ -555,7 +544,7 @@
 
     // Boolean
     .o_field_boolean {
-        margin: 0 $o-form-spacing-unit 0 0;
+        margin-right: $o-form-spacing-unit;
     }
 
     // Timezone widget warning
@@ -605,19 +594,18 @@
         }
     }
     &.o_company_document_layout {
-        .image_selection_container {
+        .report_layout_container {
+            display: inline-block;
             div {
-                width: 50%;
+                display: inline-block;
                 img {
                     margin-left: 0 !important;
                 }
             }
         }
-        td {
-            padding: 0 45px 0 0;
-        }
         img[name="logo"] {
-            max-height: 300px;
+            max-height: 100px;
+            max-width: 300px;
         }
     }
 }
@@ -646,6 +634,12 @@
     &:not(.modal-lg) .o_form_view {
         .o_group {
             width: 100%;
+        }
+    }
+    .o_onboarding_payment_acquirer_wizard {
+        a[type="action"] {
+            color: $link-color;
+            cursor: pointer;
         }
     }
 }

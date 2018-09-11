@@ -30,7 +30,7 @@ def format_date(env, date, pattern=False):
 
 def format_tz(env, dt, tz=False, format=False):
     record_user_timestamp = env.user.sudo().with_context(tz=tz or env.user.sudo().tz or 'UTC')
-    timestamp = datetime.datetime.strptime(dt, tools.DEFAULT_SERVER_DATETIME_FORMAT)
+    timestamp = fields.Datetime.from_string(dt)
 
     ts = fields.Datetime.context_timestamp(record_user_timestamp, timestamp)
 
@@ -253,17 +253,17 @@ class MailTemplate(models.Model):
     def unlink_action(self):
         for template in self:
             if template.ref_ir_act_window:
-                template.ref_ir_act_window.sudo().unlink()
+                template.ref_ir_act_window.unlink()
         return True
 
     @api.multi
     def create_action(self):
-        ActWindowSudo = self.env['ir.actions.act_window'].sudo()
+        ActWindow = self.env['ir.actions.act_window']
         view = self.env.ref('mail.email_compose_message_wizard_form')
 
         for template in self:
             button_name = _('Send Mail (%s)') % template.name
-            action = ActWindowSudo.create({
+            action = ActWindow.create({
                 'name': button_name,
                 'type': 'ir.actions.act_window',
                 'res_model': 'mail.compose.message',

@@ -98,20 +98,24 @@ class PurchaseOrder(models.Model):
             if order.state in ('draft', 'sent', 'to approve'):
                 for order_line in order.order_line:
                     if order_line.move_dest_ids:
-                        siblings_states = (order_line.move_dest_ids.mapped('move_orig_ids')).mapped('state')
+                        move_dest_ids = order_line.move_dest_ids.filtered(lambda m: m.state not in ('done', 'cancel'))
+                        siblings_states = (move_dest_ids.mapped('move_orig_ids')).mapped('state')
                         if all(state in ('done', 'cancel') for state in siblings_states):
-                            order_line.move_dest_ids.write({'procure_method': 'make_to_stock'})
-                            order_line.move_dest_ids._recompute_state()
+                            move_dest_ids.write({'procure_method': 'make_to_stock'})
+                            move_dest_ids._recompute_state()
 
             for pick in order.picking_ids.filtered(lambda r: r.state != 'cancel'):
                 pick.action_cancel()
+
+            order.order_line.write({'move_dest_ids':[(5,0,0)]})
+
         return super(PurchaseOrder, self).button_cancel()
 
     @api.multi
     def action_view_picking(self):
         """ This function returns an action that display existing picking orders of given purchase order ids. When only one found, show the picking immediately.
         """
-        action = self.env.ref('stock.action_picking_tree')
+        action = self.env.ref('stock.action_picking_tree_all')
         result = action.read()[0]
         # override the context to get rid of the default filtering on operation type
         result['context'] = {}

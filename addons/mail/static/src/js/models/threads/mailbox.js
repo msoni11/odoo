@@ -1,7 +1,7 @@
 odoo.define('mail.model.Mailbox', function (require) {
 "use strict";
 
-var ThreadWithCache = require('mail.model.ThreadWithCache');
+var SearchableThread = require('mail.model.SearchableThread');
 
 var core = require('web.core');
 
@@ -14,16 +14,14 @@ var _t = core._t;
  * list of messages, but the inbox does not represent a conversation: Inbox is
  * modeled as a mailbox.
  */
-var Mailbox = ThreadWithCache.extend({
+var Mailbox = SearchableThread.extend({
 
     /**
      * @override
      * @param {Object} params
      * @param {Object} params.data
-     * @param {string} params.data.id the ID of the mailbox, without the
-     *   'mailbox_' prefix.
-     * @param {integer} [params.data.mailboxCounter=0] the initial mailbox
-     *   counter of this mailbox.
+     * @param {string} params.data.id the ID of the mailbox, without the ``mailbox_`` prefix.
+     * @param {integer} [params.data.mailboxCounter=0] the initial mailbox counter of this mailbox.
      */
     init: function (params) {
         var data = params.data;
@@ -204,7 +202,7 @@ var Mailbox = ThreadWithCache.extend({
         } else if (this._id === 'mailbox_moderation') {
             return [['need_moderation', '=', true]];
         } else {
-            throw _t(_.str("Missing domain for mailbox with ID '%s'", this._id));
+            throw (_.str(_t("Missing domain for mailbox with ID '%s'"), this._id));
         }
     },
 });

@@ -174,7 +174,7 @@ class WebsiteSale(http.Controller):
     def _get_search_order(self, post):
         # OrderBy will be parsed in orm and so no direct sql injection
         # id is added to be sure that order is a unique sort key
-        return 'website_published desc,%s , id desc' % post.get('order', 'website_sequence desc')
+        return 'is_published desc,%s , id desc' % post.get('order', 'website_sequence desc')
 
     def _get_search_domain(self, search, category, attrib_values):
         domain = request.website.sale_product_domain()
@@ -206,12 +206,14 @@ class WebsiteSale(http.Controller):
         return domain
 
     @http.route([
-        '/shop',
-        '/shop/page/<int:page>',
-        '/shop/category/<model("product.public.category"):category>',
-        '/shop/category/<model("product.public.category"):category>/page/<int:page>'
+        '''/shop''',
+        '''/shop/page/<int:page>''',
+        '''/shop/category/<model("product.public.category", "[('website_id', 'in', (False, current_website_id))]"):category>''',
+        '''/shop/category/<model("product.public.category", "[('website_id', 'in', (False, current_website_id))]"):category>/page/<int:page>'''
     ], type='http', auth="public", website=True)
     def shop(self, page=0, category=None, search='', ppg=False, **post):
+        if category and not category.can_access_from_current_website():
+            raise NotFound()
         if ppg:
             try:
                 ppg = int(ppg)
@@ -245,8 +247,16 @@ class WebsiteSale(http.Controller):
         if attrib_list:
             post['attrib'] = attrib_list
 
-        categs = request.env['product.public.category'].search([('parent_id', '=', False)])
         Product = request.env['product.template']
+
+        Category = request.env['product.public.category']
+        search_categories = False
+        if search:
+            categories = Product.search(domain).mapped('public_categ_ids')
+            search_categories = Category.search([('id', 'parent_of', categories.ids)] + request.website.website_domain())
+            categs = search_categories.filtered(lambda c: not c.parent_id)
+        else:
+            categs = Category.search([('parent_id', '=', False)] + request.website.website_domain())
 
         parent_category_ids = []
         if category:
@@ -285,6 +295,7 @@ class WebsiteSale(http.Controller):
             'compute_currency': compute_currency,
             'keep': keep,
             'parent_category_ids': parent_category_ids,
+            'search_categories_ids': search_categories and search_categories.ids,
         }
         if category:
             values['main_object'] = category
@@ -292,6 +303,9 @@ class WebsiteSale(http.Controller):
 
     @http.route(['/shop/product/<model("product.template"):product>'], type='http', auth="public", website=True)
     def product(self, product, category='', search='', **kwargs):
+        if not product.can_access_from_current_website():
+            raise NotFound()
+
         product_context = dict(request.env.context,
                                active_id=product.id,
                                partner=request.env.user.partner_id)
@@ -578,6 +592,7 @@ class WebsiteSale(http.Controller):
 
         new_values['customer'] = True
         new_values['team_id'] = request.website.salesteam_id and request.website.salesteam_id.id
+        new_values['website_id'] = request.website.id
 
         lang = request.lang if request.lang in request.website.mapped('language_ids.code') else None
         if lang:
@@ -779,6 +794,7 @@ class WebsiteSale(http.Controller):
 
         domain = expression.AND([
             ['&', ('website_published', '=', True), ('company_id', '=', order.company_id.id)],
+            ['|', ('website_id', '=', False), ('website_id', '=', request.website.id)],
             ['|', ('specific_countries', '=', False), ('country_ids', 'in', [order.partner_id.country_id.id])]
         ])
         acquirers = request.env['payment.acquirer'].search(domain)
@@ -992,7 +1008,8 @@ class WebsiteSale(http.Controller):
     def add_product(self, name=None, category=0, **post):
         product = request.env['product.product'].create({
             'name': name or _("New Product"),
-            'public_categ_ids': category
+            'public_categ_ids': category,
+            'website_id': request.website.id,
         })
         return "/shop/product/%s?enable_editor=1" % slug(product.product_tmpl_id)
 

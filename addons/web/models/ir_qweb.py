@@ -41,7 +41,7 @@ class Image(models.AbstractModel):
             if max_width or max_height:
                 max_size = '%sx%s' % (max_width, max_height)
 
-        sha = hashlib.sha1(getattr(record, '__last_update').encode('utf-8')).hexdigest()[0:7]
+        sha = hashlib.sha1(str(getattr(record, '__last_update')).encode('utf-8')).hexdigest()[0:7]
         max_size = '' if max_size is None else '/%s' % max_size
         avoid_if_small = '&avoid_if_small=true' if options.get('avoid_if_small') else ''
         src = '/web/image/%s/%s/%s%s?unique=%s%s' % (record._name, record.id, field_name, max_size, sha, avoid_if_small)
@@ -65,6 +65,7 @@ class Image(models.AbstractModel):
         atts["alt"] = alt
         atts["data-zoom"] = src_zoom and u'1' or None
         atts["data-zoom-image"] = src_zoom
+        atts["data-no-post-process"] = options.get('data-no-post-process')
 
         atts = self.env['ir.qweb']._post_processing_att('img', atts, options.get('template_options'))
 

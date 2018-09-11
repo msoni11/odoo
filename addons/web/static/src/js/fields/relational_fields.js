@@ -108,7 +108,12 @@ var FieldMany2One = AbstractField.extend({
     }),
     AUTOCOMPLETE_DELAY: 200,
 
-    init: function () {
+    /**
+     * @override
+     * @param {boolean} [options.noOpen=false] if true, there is no external
+     *   button to open the related record in a dialog
+     */
+    init: function (parent, name, record, options) {
         this._super.apply(this, arguments);
         this.limit = 7;
         this.orderer = new concurrency.DropMisordered();
@@ -121,6 +126,7 @@ var FieldMany2One = AbstractField.extend({
         this.nodeOptions = _.defaults(this.nodeOptions, {
             quick_create: true,
         });
+        this.noOpen = 'noOpen' in (options || {}) ? options.noOpen : this.nodeOptions.no_open;
         this.m2o_value = this._formatValue(this.value);
         // 'recordParams' is a dict of params used when calling functions
         // 'getDomain' and 'getContext' on this.record
@@ -340,7 +346,7 @@ var FieldMany2One = AbstractField.extend({
     _renderReadonly: function () {
         var value = _.escape((this.m2o_value || "").trim()).split("\n").join("<br/>");
         this.$el.html(value);
-        if (!this.nodeOptions.no_open && this.value) {
+        if (!this.noOpen && this.value) {
             this.$el.attr('href', _.str.sprintf('#id=%s&model=%s', this.value.res_id, this.field.relation));
             this.$el.addClass('o_form_uri');
         }
@@ -365,6 +371,9 @@ var FieldMany2One = AbstractField.extend({
 
         var context = this.record.getContext(this.recordParams);
         var domain = this.record.getDomain(this.recordParams);
+
+        // Add the additionalContext
+        _.extend(context, this.additionalContext)
 
         var blacklisted_ids = this._getSearchBlacklist();
         if (blacklisted_ids.length > 0) {
@@ -478,7 +487,7 @@ var FieldMany2One = AbstractField.extend({
      * @private
      */
     _updateExternalButton: function () {
-        var has_external_button = !this.nodeOptions.no_open && !this.floating && this.isSet();
+        var has_external_button = !this.noOpen && !this.floating && this.isSet();
         this.$external_button.toggle(has_external_button);
         this.$el.toggleClass('o_with_button', has_external_button); // Should not be required anymore but kept for compatibility
     },
@@ -494,7 +503,7 @@ var FieldMany2One = AbstractField.extend({
      */
     _onClick: function (event) {
         var self = this;
-        if (this.mode === 'readonly' && !this.nodeOptions.no_open) {
+        if (this.mode === 'readonly' && !this.noOpen) {
             event.preventDefault();
             event.stopPropagation();
             this._rpc({
@@ -1115,6 +1124,14 @@ var FieldX2Many = AbstractField.extend({
                 operation: 'UPDATE',
                 id: ev.data.dataPointID,
                 data: changes,
+            }).done(function () {
+                if (ev.data.onSuccess) {
+                    ev.data.onSuccess();
+                }
+            }).fail(function () {
+                if (ev.data.onFailure) {
+                    ev.data.onFailure();
+                }
             });
         }
     },
@@ -1306,6 +1323,7 @@ var FieldOne2Many = FieldX2Many.extend({
             fields_view: this.attrs.views && this.attrs.views.form,
             parentID: this.value.id,
             viewInfo: this.view,
+            deletable: this.activeActions.delete,
         }));
     },
 
@@ -1366,9 +1384,9 @@ var FieldOne2Many = FieldX2Many.extend({
      */
     _onOpenRecord: function (ev) {
         // we don't want interference with the components upstream.
+        var self = this;
         ev.stopPropagation();
 
-        var self = this;
         var id = ev.data.id;
         var onSaved = function (record) {
             if (_.some(self.value.data, {id: record.id})) {
@@ -1389,6 +1407,10 @@ var FieldOne2Many = FieldX2Many.extend({
         this._openFormDialog({
             id: id,
             on_saved: onSaved,
+            on_remove: function () {
+                self._setValue({operation: 'DELETE', ids: [id]});
+            },
+            deletable: this.activeActions.delete,
             readonly: this.mode === 'readonly',
         });
     },
@@ -1455,7 +1477,11 @@ var FieldMany2Many = FieldX2Many.extend({
                 self._setValue({operation: 'TRIGGER_ONCHANGE'}, {forceChange: true});
                 self.trigger_up('reload', {db_id: ev.data.id});
             },
+            on_remove: function () {
+                self._setValue({operation: 'FORGET', ids: [ev.data.id]});
+            },
             readonly: this.mode === 'readonly',
+            deletable: this.activeActions.delete,
             string: this.string,
         });
     },
@@ -1466,6 +1492,7 @@ var FieldMany2Many = FieldX2Many.extend({
  */
 var FieldMany2ManyBinaryMultiFiles = AbstractField.extend({
     template: "FieldBinaryFileUploader",
+    template_files: "FieldBinaryFileUploader.files",
     supportedFieldTypes: ['many2many'],
     fieldsToFetch: {
         name: {type: 'char'},
@@ -1540,7 +1567,7 @@ var FieldMany2ManyBinaryMultiFiles = AbstractField.extend({
         // _setValue, we put the rendering here to ensure they will be updated
         this._generatedMetadata();
         this.$('.oe_placeholder_files, .oe_attachments')
-            .replaceWith($(qweb.render('FieldBinaryFileUploader.files', {
+            .replaceWith($(qweb.render(this.template_files, {
                 widget: this,
             })));
         this.$('.oe_fileupload').show();
@@ -1601,6 +1628,10 @@ var FieldMany2ManyBinaryMultiFiles = AbstractField.extend({
 
         var files = ev.target.files;
         var attachment_ids = this.value.res_ids;
+
+        // Don't create an attachment if the upload window is cancelled.
+        if(files.length == 0)
+            return;
 
         _.each(files, function (file) {
             var record = _.find(self.value.data, function (attachment) {
@@ -1774,14 +1805,15 @@ var FieldMany2ManyTags = AbstractField.extend({
         }
         this.many2one = new FieldMany2One(this, this.name, this.record, {
             mode: 'edit',
+            noOpen: true,
             viewType: this.viewType,
+            attrs: this.attrs,
         });
         // to prevent the M2O to take the value of the M2M
         this.many2one.value = false;
         // to prevent the M2O to take the relational values of the M2M
         this.many2one.m2o_value = '';
 
-        this.many2one.nodeOptions.no_open = true;
         this.many2one._getSearchBlacklist = function () {
             return self.value.res_ids;
         };
@@ -1809,6 +1841,7 @@ var FieldMany2ManyTags = AbstractField.extend({
      * @param {MouseEvent} event
      */
     _onDeleteTag: function (event) {
+        event.stopPropagation();
         this._removeTag($(event.target).parent().data('id'));
     },
     /**
@@ -1883,8 +1916,8 @@ var FormFieldMany2ManyTags = FieldMany2ManyTags.extend({
                 'tag_id': tagID,
             }));
 
-            $(ev.currentTarget).append(this.$color_picker);
-            this.$color_picker.dropdown('toggle');
+            $(ev.currentTarget).after(this.$color_picker);
+            this.$color_picker.dropdown();
             this.$color_picker.attr("tabindex", 1).focus();
             if (!tagColor) {
                 this.$('.custom-checkbox input').prop('checked', true);
@@ -2156,6 +2189,19 @@ var FieldSelection = AbstractField.extend({
     isSet: function () {
         return this.value !== false;
     },
+    /**
+     * Listen to modifiers updates to hide/show the falsy value in the dropdown
+     * according to the required modifier.
+     *
+     * @override
+     */
+    updateModifiersValue: function () {
+        this._super.apply(this, arguments);
+        if (!this.attrs.modifiersValue.invisible && this.mode !== 'readonly') {
+            this._setValues();
+            this._renderEdit();
+        }
+    },
 
     //--------------------------------------------------------------------------
     // Private
@@ -2209,7 +2255,9 @@ var FieldSelection = AbstractField.extend({
                 return v[0] === false && v[1] === '';
             });
         }
-        this.values = [[false, this.attrs.placeholder || '']].concat(this.values);
+        if (!this.attrs.modifiersValue || !this.attrs.modifiersValue.required) {
+            this.values = [[false, this.attrs.placeholder || '']].concat(this.values);
+        }
     },
 
     //--------------------------------------------------------------------------
@@ -2496,9 +2544,9 @@ var FieldReference = FieldMany2One.extend({
      * @private
      */
     _reset: function () {
+        this._super.apply(this, arguments);
         var value = this.$('select').val();
         this._setState();
-        this._super.apply(this, arguments);
         this.$('select').val(this.value && this.value.model || value);
     },
     /**

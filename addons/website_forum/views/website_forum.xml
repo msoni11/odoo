@@ -25,7 +25,7 @@
 <template id="link_button">
     <form method="POST" t-att-action="url" t-attf-class="#{form_classes}">
         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-        <button t-attf-class="fa btn-link #{classes} #{karma and 'karma_required text-muted' or ''}" t-attf-data-karma="#{karma}">
+        <button t-attf-class="fa btn btn-link #{classes} #{karma and 'karma_required text-muted' or ''}" t-attf-data-karma="#{karma}">
             <t t-esc="label"/></button>
     </form>
 </template>
@@ -154,15 +154,15 @@
                             </t>
                         </div>
                     </div>
-                    <div class="card" id="about_forum">
+                    <div class="card mt-2" id="about_forum">
                         <h3 class="card-header">About This Community</h3>
                         <div class="card-body">
                             <span t-field="forum.description"/>
-                            <a t-if="not header.get('is_guidelines')" t-attf-href="/forum/#{slug(forum)}/faq" class="fa fa-arrow-right"> Read Guidelines</a>
-                            <a t-if="header.get('is_guidelines')" t-attf-href="/forum/#{slug(forum)}" class="fa fa-arrow-right"> Back to <span t-field="forum.name"/></a>
+                            <a t-if="not header.get('is_guidelines')" t-attf-href="/forum/#{slug(forum)}/faq"><i class="fa fa-arrow-right"/> Read Guidelines</a>
+                            <a t-if="header.get('is_guidelines')" t-attf-href="/forum/#{slug(forum)}"><i class="fa fa-arrow-right"/> Back to <span t-field="forum.name"/></a>
                         </div>
                     </div>
-                    <div class="card" id="moderation_tools" t-if="user.karma>=forum.karma_moderate">
+                    <div class="card mt-2" id="moderation_tools" t-if="user.karma>=forum.karma_moderate">
                         <h3 class="card-header">Moderation Tools</h3>
                         <div class="card-body text-center">
                             <a t-attf-href="/forum/#{slug(forum)}/validation_queue"><strong><t t-esc="forum.count_posts_waiting_validation"/></strong> waiting for validation</a>
@@ -171,7 +171,7 @@
                         </div>
                     </div>
                     <div t-if="header.get('question_data')">
-                        <div class="card">
+                        <div class="card mt-2">
                             <h3 class="card-header text-center">Question tools</h3>
                             <div class="card-body text-center">
                                 <t t-call="website_mail.follow"><t t-set="object" t-value="question"/></t>
@@ -248,8 +248,8 @@
 
                 <t t-esc="question.child_count"/>
                 <t t-if="question.post_type == 'question'">
-                    <t t-if="question.child_count&lt;=1">View</t>
-                    <t t-else="">Views</t>
+                    <t t-if="question.child_count&lt;=1">Answer</t>
+                    <t t-else="">Answers</t>
                 </t>
                 <t t-if="question.post_type != 'question'">
                     <t t-if="question.child_count&lt;=1">Comment</t>
@@ -724,13 +724,6 @@
 
 <!-- Specific Post Layout -->
 <template id="post_description_full" name="Question Navigation">
-    <t t-set="head">
-        <meta name="twitter:card" content="summary" />
-        <meta name="twitter:site" t-attf-content="@#{res_company.name}" />
-        <meta name="twitter:title" t-att-content="question.name" />
-        <meta name="twitter:description" t-att-content="question.content" />
-        <meta name="twitter:image" t-attf-content="#{request.httprequest.url_root}forum/user/#{question.create_uid.id}/avatar"/>
-    </t>
     <t t-call="website_forum.header">
         <div class="alert alert-info text-center" role="status" t-if="forum and question.state == 'pending' and user.karma>=forum.karma_moderate and question.active">
             <p class='text-muted mb16'>This post is currently awaiting moderation and not yet published... Do you want <i>Accept</i> or <i>Reject</i> this post ?</p>
@@ -1413,7 +1406,7 @@
                 </div>
                 <t t-if="uid == user.id">
                     <div>
-                        <a class="fa fa-arrow-right" t-attf-href="/forum/#{slug(forum)}/user/#{slug(user)}/edit">Edit Your Profile</a>
+                        <a t-attf-href="/forum/#{slug(forum)}/user/#{slug(user)}/edit"><i class="fa fa-arrow-right"/>Edit Your Profile</a>
                     </div>
                 </t>
             </div>

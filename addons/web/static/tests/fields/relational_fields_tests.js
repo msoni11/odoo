@@ -4,6 +4,7 @@ odoo.define('web.relational_fields_tests', function (require) {
 var AbstractField = require('web.AbstractField');
 var BasicModel = require('web.BasicModel');
 var concurrency = require('web.concurrency');
+var config = require('web.config');
 var FormView = require('web.FormView');
 var ListRenderer = require('web.ListRenderer');
 var ListView = require('web.ListView');
@@ -486,8 +487,8 @@ QUnit.module('relational_fields', {
         form.destroy();
     });
 
-    QUnit.test('many2one readonly fields with option "no_open"', function (assert) {
-        assert.expect(1);
+    QUnit.test('many2one fields with option "no_open"', function (assert) {
+        assert.expect(3);
 
         var form = createView({
             View: FormView,
@@ -503,7 +504,14 @@ QUnit.module('relational_fields', {
             res_id: 1,
         });
 
-        assert.strictEqual(form.$('a.o_form_uri').length, 0, "should not have an anchor");
+        assert.strictEqual(form.$('span.o_field_widget[name=trululu]').length, 1,
+            "should be displayed inside a span (sanity check)");
+        assert.strictEqual(form.$('span.o_form_uri').length, 0, "should not have an anchor");
+
+        form.$buttons.find('.o_form_button_edit').click();
+        assert.strictEqual(form.$('.o_field_widget[name=trululu] .o_external_button').length,
+            0, "should not have the button to open the record");
+
         form.destroy();
     });
 
@@ -750,7 +758,7 @@ QUnit.module('relational_fields', {
     });
 
     QUnit.test('standalone many2one field', function (assert) {
-        assert.expect(3);
+        assert.expect(4);
         var done = assert.async();
 
         var M2O_DELAY = relationalFields.FieldMany2One.prototype.AUTOCOMPLETE_DELAY;
@@ -769,13 +777,7 @@ QUnit.module('relational_fields', {
             relation: 'partner',
             type: 'many2one',
             value: [1, 'first partner'],
-        }], {
-            partner_id: {
-                options: {
-                    no_open: true,
-                },
-            },
-        }).then(function (recordID) {
+        }]).then(function (recordID) {
             var record = model.get(recordID);
             // create a new widget that uses the StandaloneFieldManagerMixin
             var StandaloneWidget = Widget.extend(StandaloneFieldManagerMixin, {
@@ -793,11 +795,9 @@ QUnit.module('relational_fields', {
                 },
             });
 
-            var relField = new relationalFields.FieldMany2One(parent,
-                'partner_id',
-                record,
-                {
-                    mode: 'edit',
+            var relField = new relationalFields.FieldMany2One(parent, 'partner_id', record, {
+                mode: 'edit',
+                noOpen: true,
             });
 
             relField.appendTo(fixture);
@@ -807,7 +807,11 @@ QUnit.module('relational_fields', {
                 var $dropdown = $('input.o_input').autocomplete('widget');
                 $dropdown.find('.o_m2o_dropdown_option:contains(Create)')
                     .first().mouseenter().click();
+
+                assert.strictEqual(relField.$('.o_external_button').length, 0,
+                    "should not have the button to open the record");
                 assert.verifySteps(['name_search', 'name_create']);
+
                 parent.destroy();
                 model.destroy();
                 relationalFields.FieldMany2One.prototype.AUTOCOMPLETE_DELAY = M2O_DELAY;
@@ -4653,9 +4657,9 @@ QUnit.module('relational_fields', {
         form.destroy();
     });
 
-    QUnit.test('one2many list: unlink one record', function (assert) {
-        assert.expect(6);
-        this.data.partner.records[0].p = [2, 4];
+    QUnit.test('one2many list: unlink two records', function (assert) {
+        assert.expect(9);
+        this.data.partner.records[0].p = [1, 2, 4];
         var form = createView({
             View: FormView,
             model: 'partner',
@@ -4671,37 +4675,51 @@ QUnit.module('relational_fields', {
             mockRPC: function (route, args) {
                 if (route === '/web/dataset/call_kw/partner/write') {
                     var commands = args.args[1].p;
-                    assert.strictEqual(commands.length, 2,
-                        'should have generated two commands');
+                    assert.strictEqual(commands.length, 3,
+                        'should have generated three commands');
                     assert.ok(commands[0][0] === 4 && commands[0][1] === 4,
                         'should have generated the command 4 (LINK_TO) with id 4');
-                    assert.ok(commands[1][0] === 3 && commands[1][1] === 2,
+                    assert.ok(commands[1][0] === 3 && commands[1][1] === 1,
+                        'should have generated the command 3 (UNLINK) with id 1');
+                    assert.ok(commands[2][0] === 3 && commands[2][1] === 2,
                         'should have generated the command 3 (UNLINK) with id 2');
                 }
                 return this._super.apply(this, arguments);
             },
+            archs: {
+                'partner,false,form':
+                    '<form string="Partner"><field name="display_name"/></form>',
+            },
         });
         form.$buttons.find('.o_form_button_edit').click();
 
-        assert.strictEqual(form.$('td.o_list_record_remove button').length, 2,
-            "should have 2 remove buttons");
+        assert.strictEqual(form.$('td.o_list_record_remove button').length, 3,
+            "should have 3 remove buttons");
 
         assert.ok(form.$('td.o_list_record_remove button').first().hasClass('fa fa-times'),
             "should have X icons to remove (unlink) records");
 
         form.$('td.o_list_record_remove button').first().click();
 
+        assert.strictEqual(form.$('td.o_list_record_remove button').length, 2,
+            "should have 2 remove buttons (a record is supposed to have been unlinked)");
+
+        form.$('tr.o_data_row').first().click();
+        assert.strictEqual($('.modal .modal-footer .o_btn_remove').length, 1,
+            'there should be a modal having Remove Button');
+        $('.modal .modal-footer .o_btn_remove').click();
+
         assert.strictEqual(form.$('td.o_list_record_remove button').length, 1,
-            "should have 1 remove button (a record is supposed to have been unlinked)");
+            "should have 1 delete button (another record is supposed to have been unlinked)");
 
         // save and check that the correct command has been generated
         form.$buttons.find('.o_form_button_save').click();
         form.destroy();
     });
 
-    QUnit.test('one2many list: deleting one record', function (assert) {
-        assert.expect(6);
-        this.data.partner.records[0].p = [2, 4];
+    QUnit.test('one2many list: deleting two records', function (assert) {
+        assert.expect(9);
+        this.data.partner.records[0].p = [1, 2, 4];
         var form = createView({
             View: FormView,
             model: 'partner',
@@ -4717,28 +4735,42 @@ QUnit.module('relational_fields', {
             mockRPC: function (route, args) {
                 if (route === '/web/dataset/call_kw/partner/write') {
                     var commands = args.args[1].p;
-                    assert.strictEqual(commands.length, 2,
-                        'should have generated two commands');
+                    assert.strictEqual(commands.length, 3,
+                        'should have generated three commands');
                     assert.ok(commands[0][0] === 4 && commands[0][1] === 4,
                         'should have generated the command 4 (LINK_TO) with id 4');
-                    assert.ok(commands[1][0] === 2 && commands[1][1] === 2,
+                    assert.ok(commands[1][0] === 2 && commands[1][1] === 1,
+                        'should have generated the command 2 (DELETE) with id 1');
+                    assert.ok(commands[2][0] === 2 && commands[2][1] === 2,
                         'should have generated the command 2 (DELETE) with id 2');
                 }
                 return this._super.apply(this, arguments);
             },
+            archs: {
+                'partner,false,form':
+                    '<form string="Partner"><field name="display_name"/></form>',
+            },
         });
         form.$buttons.find('.o_form_button_edit').click();
 
-        assert.strictEqual(form.$('td.o_list_record_remove button').length, 2,
-            "should have 2 remove buttons");
+        assert.strictEqual(form.$('td.o_list_record_remove button').length, 3,
+            "should have 3 remove buttons");
 
         assert.ok(form.$('td.o_list_record_remove button').first().hasClass('fa fa-trash-o'),
             "should have trash bin icons to remove (delete) records");
 
         form.$('td.o_list_record_remove button').first().click();
 
+        assert.strictEqual(form.$('td.o_list_record_remove button').length, 2,
+            "should have 2 remove buttons (a record is supposed to have been deleted)");
+
+        form.$('tr.o_data_row').first().click();
+        assert.strictEqual($('.modal .modal-footer .o_btn_remove').length, 1,
+            'there should be a modal having Remove Button');
+        $('.modal .modal-footer .o_btn_remove').click();
+
         assert.strictEqual(form.$('td.o_list_record_remove button').length, 1,
-            "should have 1 remove button (a record is supposed to have been deleted)");
+            "should have 1 remove button (another record is supposed to have been deleted)");
 
         // save and check that the correct command has been generated
         form.$buttons.find('.o_form_button_save').click();
@@ -4750,7 +4782,7 @@ QUnit.module('relational_fields', {
     });
 
     QUnit.test('one2many kanban: edition', function (assert) {
-        assert.expect(16);
+        assert.expect(17);
 
         this.data.partner.records[0].p = [2];
         var form = createView({
@@ -4832,7 +4864,10 @@ QUnit.module('relational_fields', {
             'should contain 4 records');
 
         // delete subrecords
-        form.$('.o_kanban_view .delete_icon:first()').click();
+        form.$('.oe_kanban_global_click').first().click();
+        assert.strictEqual($('.modal .modal-footer .o_btn_remove').length, 1,
+            'There should be a modal having Remove Button');
+        $('.modal .modal-footer .o_btn_remove').click(); // Click Remove Button of Formview Dialog
         assert.strictEqual(form.$('.o_kanban_record:not(.o_kanban_ghost)').length, 3,
             'should contain 3 records');
         form.$('.o_kanban_view .delete_icon:first()').click();
@@ -4844,7 +4879,7 @@ QUnit.module('relational_fields', {
         form.destroy();
     });
 
-    QUnit.test('one2many kabnan(editable): properly handle create_text node option', function (assert) {
+    QUnit.test('one2many kanban (editable): properly handle create_text node option', function (assert) {
         assert.expect(1);
 
         var form = createView({
@@ -10133,10 +10168,76 @@ QUnit.module('relational_fields', {
         form.destroy();
     });
 
+    QUnit.test('one2many with onchange, required field, shortcut enter', function (assert) {
+        assert.expect(5);
+
+        this.data.turtle.onchanges = {
+            turtle_foo: function () {},
+        };
+
+        var def;
+        var form = createView({
+            View: FormView,
+            model: 'partner',
+            data: this.data,
+            arch: '<form string="Partners">' +
+                    '<field name="turtles">' +
+                        '<tree editable="bottom">' +
+                            '<field name="turtle_foo" required="1"/>' +
+                        '</tree>' +
+                    '</field>' +
+                '</form>',
+            mockRPC: function (route, args) {
+                var result = this._super.apply(this, arguments);
+                if (args.method === 'onchange') {
+                    return $.when(def).then(_.constant(result));
+                }
+                return result;
+            },
+            // simulate what happens in the client:
+            // the new value isn't notified directly to the model
+            fieldDebounce: 5000,
+        });
+
+        var value = "hello";
+
+        // add a new line
+        form.$('.o_field_x2many_list_row_add a').click();
+
+        // we want to add a delay to simulate an onchange
+        def = $.Deferred();
+
+        // write something in the field
+        var $input = form.$('input[name="turtle_foo"]');
+        $input.val(value).trigger('input');
+
+        // trigger keydown ENTER
+        $input.trigger($.Event('keydown', {
+            keyCode: $.ui.keyCode.ENTER,
+            which: $.ui.keyCode.ENTER,
+        }));
+
+        // check that nothing changed before the onchange finished
+        assert.strictEqual($input.val(), value, "input content shouldn't change");
+        assert.strictEqual(form.$('.o_data_row').length, 1,
+            "should still contain only one row");
+
+        // unlock onchange
+        def.resolve();
+
+        // check the current line is added with the correct content and a new line is editable
+        assert.strictEqual(form.$('td.o_data_cell').text(), value);
+        assert.strictEqual(form.$('input[name="turtle_foo"]').val(), '');
+        assert.strictEqual(form.$('.o_data_row').length, 2,
+            "should now contain two rows");
+
+        form.destroy();
+    });
+
     QUnit.module('FieldMany2Many');
 
     QUnit.test('many2many kanban: edition', function (assert) {
-        assert.expect(29);
+        assert.expect(32);
 
         this.data.partner.records[0].timmy = [12, 14];
         this.data.partner_type.records.push({id: 15, display_name: "red", color: 6});
@@ -10188,7 +10289,7 @@ QUnit.module('relational_fields', {
                     var createdType = _.findWhere(this.data.partner_type.records, {
                         display_name: "A new type"
                     });
-                    var ids = _.sortBy([12, 15, 18, 21].concat(createdType.id), _.identity.bind(_));
+                    var ids = _.sortBy([12, 15, 18].concat(createdType.id), _.identity.bind(_));
                     assert.ok(_.isEqual(_.sortBy(commands[0][2], _.identity.bind(_)), ids),
                         "new value should be " + ids);
                 }
@@ -10266,10 +10367,19 @@ QUnit.module('relational_fields', {
             'the newly created type should be in the kanban');
 
         // delete subrecords
-        form.$('.o_kanban_record:contains(silver) .delete_icon').click();
+        form.$('.o_kanban_record:contains(silver)').click();
+        assert.strictEqual($('.modal .modal-footer .o_btn_remove').length, 1,
+            'There should be a modal having Remove Button');
+        $('.modal .modal-footer .o_btn_remove').click(); // Click Remove Button of Formview Dialog
         assert.strictEqual(form.$('.o_kanban_record:not(.o_kanban_ghost)').length, 5,
             'should contain 5 records');
         assert.ok(!form.$('.o_kanban_record:contains(silver)').length,
+            'the removed record should not be in kanban anymore');
+
+        form.$('.o_kanban_record:contains(blue) .delete_icon').click();
+        assert.strictEqual(form.$('.o_kanban_record:not(.o_kanban_ghost)').length, 4,
+            'should contain 4 records');
+        assert.ok(!form.$('.o_kanban_record:contains(blue)').length,
             'the removed record should not be in kanban anymore');
 
         // save the record
@@ -11056,6 +11166,31 @@ QUnit.module('relational_fields', {
         form.destroy();
     });
 
+    QUnit.test('widget many2many_tags', function (assert) {
+        assert.expect(1);
+        this.data.turtle.records[0].partner_ids = [2];
+
+        var form = createView({
+            View: FormView,
+            model: 'turtle',
+            data: this.data,
+            arch:'<form string="Turtles">' +
+                    '<sheet>' +
+                        '<field name="display_name"/>' +
+                        '<field name="partner_ids" widget="many2many_tags"/>' +
+                    '</sheet>' +
+                '</form>',
+            res_id: 1,
+        });
+
+        assert.deepEqual(
+            form.$('.o_field_many2manytags.o_field_widget .badge .o_badge_text').attr('title'),
+            'second record', 'the title should be filled in'
+        );
+
+        form.destroy();
+    });
+
     QUnit.module('FieldStatus');
 
     QUnit.test('static statusbar widget on many2one field', function (assert) {
@@ -11533,6 +11668,41 @@ QUnit.module('relational_fields', {
         form.destroy();
     });
 
+    QUnit.test('required selection widget should not have blank option', function (assert) {
+        assert.expect(3);
+
+        this.data.partner.fields.feedback_value = {
+            type: "selection",
+            required: true,
+            selection : [['good', 'Good'], ['bad', 'Bad']],
+            default: 'good',
+            string: 'Good'
+        };
+        var form = createView({
+            View: FormView,
+            model: 'partner',
+            data: this.data,
+            arch: '<form string="Partners">' +
+                        '<field name="feedback_value"/>' +
+                        '<field name="color" attrs="{\'required\': [(\'feedback_value\', \'=\', \'bad\')]}"/>' +
+                '</form>',
+            res_id: 1
+        });
+
+        form.$buttons.find('.o_form_button_edit').click();
+        assert.strictEqual(form.$('.o_field_widget[name=color]')[0].options.length, 3,
+            "non required selection field must have 3 options 1 blank option and 2 value options");
+        assert.strictEqual(form.$('.o_field_widget[name=feedback_value]')[0].options.length, 2,
+            "should have only 2 options without blank option");
+
+        // change value to update widget modifier values
+        form.$('.o_field_widget[name=feedback_value]').val('"bad"').trigger('change');
+        assert.strictEqual(form.$('.o_field_widget[name=color]')[0].options.length, 2,
+            "should have only 2 options");
+
+        form.destroy();
+    });
+
     QUnit.module('FieldMany2ManyTags');
 
     QUnit.test('fieldmany2many tags with and without color', function (assert) {
@@ -11568,9 +11738,9 @@ QUnit.module('relational_fields', {
         assert.strictEqual($input.autocomplete('widget').find('li').length, 3,
             "autocomplete dropdown should have 3 entries (2 values + 'Search and Edit...')");
         $input.autocomplete('widget').find('li:first()').click(); // adds a tag
-        assert.strictEqual(form.$('.o_field_many2manytags[name="timmy"] > button').length, 1,
+        assert.strictEqual(form.$('.o_field_many2manytags[name="timmy"] > .dropdown > button').length, 1,
             "should contain 1 tag");
-        assert.ok(form.$('.o_field_many2manytags[name="timmy"] > button:contains("gold")').length,
+        assert.ok(form.$('.o_field_many2manytags[name="timmy"] > .dropdown > button:contains("gold")').length,
             "should contain newly added tag 'gold'");
 
         form.destroy();
@@ -11603,7 +11773,7 @@ QUnit.module('relational_fields', {
                 return this._super.apply(this, arguments);
             },
         });
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 2,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 2,
             "should contain 2 tags");
         assert.ok(form.$('button:contains(gold)').length,
             'should have fetched and rendered gold partner tag');
@@ -11614,7 +11784,7 @@ QUnit.module('relational_fields', {
 
         form.$buttons.find('.o_form_button_edit').click();
 
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 2,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 2,
             "should still contain 2 tags in edit mode");
         assert.ok(form.$('.o_tag_color_2 .o_badge_text:contains(gold)').length,
             'first tag should still contain "gold" and be color 2 in edit mode');
@@ -11629,18 +11799,18 @@ QUnit.module('relational_fields', {
         assert.strictEqual($input.autocomplete('widget').find('li a:contains("red")').length, 1,
             "autocomplete dropdown should contain 'red'");
         $input.autocomplete('widget').find('li').click(); // add 'red'
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 3,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 3,
             "should contain 3 tags");
-        assert.ok(form.$('.o_field_many2manytags > button:contains("red")').length,
+        assert.ok(form.$('.o_field_many2manytags > .dropdown > button:contains("red")').length,
             "should contain newly added tag 'red'");
-        assert.ok(form.$('.o_field_many2manytags > button[data-color=8]:contains("red")').length,
+        assert.ok(form.$('.o_field_many2manytags > .dropdown > button[data-color=8]:contains("red")').length,
             "should have fetched the color of added tag");
 
         // remove tag with id 14
         form.$('.o_field_many2manytags button[data-id=14] .o_delete').click();
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 2,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 2,
             "should contain 2 tags");
-        assert.ok(!form.$('.o_field_many2manytags > button:contains("silver")').length,
+        assert.ok(!form.$('.o_field_many2manytags > .dropdown > button:contains("silver")').length,
             "should not contain tag 'silver' anymore");
 
         // save the record (should do the write RPC with the correct commands)
@@ -11652,7 +11822,7 @@ QUnit.module('relational_fields', {
         assert.ok(form.$('.o_field_many2manytags button[data-id=13] .o_colorpicker .custom-checkbox'), "should have a checkbox in the colorpicker dropdown menu");
 
         $input.click();
-        var $checkBox = form.$('.o_field_many2manytags button[data-id=13] .o_colorpicker .custom-checkbox input');
+        var $checkBox = form.$('.o_field_many2manytags button[data-id=13]').next().find('.custom-checkbox input');
         assert.notOk($checkBox.is(':checked'), "should have unticked checkbox in colorpicker dropdown menu");
 
         $checkBox.mousedown();
@@ -11660,7 +11830,7 @@ QUnit.module('relational_fields', {
         assert.equal($input.data('color'), "0", "should become transparent when toggling on checkbox");
 
         $input.click();
-        $checkBox = form.$('.o_field_many2manytags button[data-id=13] .o_colorpicker .custom-checkbox input'); // refresh
+        $checkBox = form.$('.o_field_many2manytags button[data-id=13]').next().find('.custom-checkbox input'); // refresh
         assert.ok($checkBox.is(':checked'), "should have a ticked checkbox in colorpicker dropdown menu after mousedown");
 
         $checkBox.mousedown();
@@ -11668,7 +11838,7 @@ QUnit.module('relational_fields', {
         assert.equal($input.data('color'), "8", "should revert to old color when toggling off checkbox");
 
         $input.click();
-        $checkBox = form.$('.o_field_many2manytags button[data-id=13] .o_colorpicker .custom-checkbox input'); // refresh
+        $checkBox = form.$('.o_field_many2manytags button[data-id=13]').next().find('.custom-checkbox input'); // refresh
         assert.notOk($checkBox.is(':checked'), "should have an unticked checkbox in colorpicker dropdown menu after 2nd click");
 
         // TODO: it would be nice to test the behaviors of the autocomplete dropdown
@@ -11701,7 +11871,7 @@ QUnit.module('relational_fields', {
                 return this._super.apply(this, arguments);
             }
         });
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 1,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 1,
             "should contain 1 tag");
         assert.ok(form.$('button:contains(gold)').length,
             'should have fetched and rendered gold partner tag');
@@ -11716,9 +11886,9 @@ QUnit.module('relational_fields', {
         assert.strictEqual($input.autocomplete('widget').find('li a:contains("silver")').length, 1,
             "autocomplete dropdown should contain 'silver'");
         $input.autocomplete('widget').find('li').click(); // add 'silver'
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 2,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 2,
             "should contain 2 tags");
-        assert.ok(form.$('.o_field_many2manytags > button:contains("silver")').length,
+        assert.ok(form.$('.o_field_many2manytags > .dropdown > button:contains("silver")').length,
             "should contain newly added tag 'silver'");
 
         form.destroy();
@@ -11751,9 +11921,9 @@ QUnit.module('relational_fields', {
         assert.strictEqual($input.autocomplete('widget').find('li').length, 3,
             "autocomplete dropdown should have 3 entries (2 values + 'Search and Edit...')");
         $input.autocomplete('widget').find('li:first()').click(); // adds a tag
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 1,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 1,
             "should contain 1 tag");
-        assert.ok(form.$('.o_field_many2manytags > button:contains("gold")').length,
+        assert.ok(form.$('.o_field_many2manytags > .dropdown > button:contains("gold")').length,
             "should contain newly added tag 'gold'");
 
         // save the record (should do the write RPC with the correct commands)
@@ -11929,7 +12099,7 @@ QUnit.module('relational_fields', {
                 '</form>',
             res_id: 1,
         });
-        assert.strictEqual(form.$('.o_field_widget[name="partner_ids"] > button').length, 100,
+        assert.strictEqual(form.$('.o_field_widget[name="partner_ids"] > .dropdown > button').length, 100,
             'should have rendered 100 tags');
         form.destroy();
     });
@@ -11954,14 +12124,14 @@ QUnit.module('relational_fields', {
         });
 
         form.$buttons.find('.o_form_button_edit').click();
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 1,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 1,
             "should contain one tag");
 
         // update foo, which will trigger an onchange and update timmy
         // -> m2mtags input should not have taken the focus
         form.$('input:first').focus();
         form.$('input:first').val('trigger onchange').trigger('input');
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 0,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 0,
             "should contain no tags");
         assert.strictEqual(form.$('input:first').get(0), document.activeElement,
             "foo input should have kept the focus");
@@ -11969,14 +12139,14 @@ QUnit.module('relational_fields', {
         // add a tag -> m2mtags input should still have the focus
         form.$('.o_field_many2manytags input').click(); // opens the dropdown
         form.$('.o_field_many2manytags input').autocomplete('widget').find('li:first').click();
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 1,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 1,
             "should contain a tag");
         assert.strictEqual(form.$('.o_field_many2manytags input').get(0), document.activeElement,
             "m2m tags input should have kept the focus");
 
         // remove a tag -> m2mtags input should still have the focus
         form.$('.o_field_many2manytags .o_delete').click();
-        assert.strictEqual(form.$('.o_field_many2manytags > button').length, 0,
+        assert.strictEqual(form.$('.o_field_many2manytags > .dropdown > button').length, 0,
             "should contain no tags");
         assert.strictEqual(form.$('.o_field_many2manytags input').get(0), document.activeElement,
             "m2m tags input should have kept the focus");

@@ -6,7 +6,7 @@
     'version': '1.0.1',
     'category': 'Point Of Sale',
     'sequence': 20,
-    'summary': 'Register sales in shops and restaurants with a touchscreen interface',
+    'summary': 'Tablet POS: shops and restaurants',
     'description': "",
     'depends': ['stock_account', 'barcodes', 'web_editor', 'digest'],
     'data': [
@@ -16,7 +16,6 @@
         'data/digest_data.xml',
         'wizard/pos_box.xml',
         'wizard/pos_details.xml',
-        'wizard/pos_discount.xml',
         'wizard/pos_open_statement.xml',
         'wizard/pos_payment.xml',
         'views/pos_templates.xml',

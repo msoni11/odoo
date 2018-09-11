@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Snail Mail",
-    'website': "https://www.odoo.com",
     'description': """
-Allows users to send invoices by post
+Allows users to send documents by post
 =====================================================
         """,
     'category': 'Tools',
     'version': '0.1',
-
-    'depends': ['account', 'iap'],
-
+    'depends': ['iap', 'mail'],
     'data': [
-        'data/mail_activity_data.xml',
-        'wizard/multi_compose_message_views.xml',
+        'data/snailmail_data.xml',
         'views/res_config_settings_views.xml',
+        'views/snailmail_views.xml',
+        'security/ir.model.access.csv',
     ],
+    'auto_install': True,
 }

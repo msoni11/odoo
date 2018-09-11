@@ -93,6 +93,7 @@ var Followers = AbstractField.extend({
             this.$('.o_subtypes_list > .dropdown-toggle').attr('disabled', true);
             this.$('.o_followers_actions .dropdown-toggle').removeClass('o_followers_following');
         }
+        this.$('button.o_followers_follow_button').attr("aria-pressed", this.is_follower);
     },
     _displayGeneric: function () {
         // only display the number of followers (e.g. if read failed)
@@ -119,7 +120,7 @@ var Followers = AbstractField.extend({
             // On mouse-enter it will show the edit_subtype pencil.
             if (record.is_editable) {
                 $follower_li.on('mouseenter mouseleave', function (e) {
-                    $(e.currentTarget).find('.o_edit_subtype').toggleClass('hide', e.type === 'mouseleave');
+                    $(e.currentTarget).find('.o_edit_subtype').toggleClass('d-none', e.type === 'mouseleave');
                 });
             }
         });
